@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder Pro</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ Audio Recorder Pro</h1>
+            <p class="subtitle">High Quality Meeting Recorder</p>
+        </div>
+
+        <div class="quality-badge">🔷 48kHz / 320kbps / Noise Filtered</div>
+
+        <div class="status-section">
+            <div id="status" class="status">Ready to record</div>
+            <div id="timer" class="timer">00:00:00</div>
+        </div>
+
+        <div class="source-settings">
+            <h3>Audio Sources</h3>
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="captureMic" checked>
+                    <span>🎤 Your Microphone</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="captureTab" checked>
+                    <span>🔊 Tab Audio (Meeting voices)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="audio-visualizer">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="recordBtn" class="btn btn-record">
+                <span class="btn-icon">⏺</span>
+                Record
+            </button>
+            <button id="pauseBtn" class="btn btn-pause" disabled>
+                <span class="btn-icon">⏸</span>
+                Pause
+            </button>
+            <button id="stopBtn" class="btn btn-stop" disabled>
+                <span class="btn-icon">⏹</span>
+                Stop
+            </button>
+        </div>
+
+        <div class="volume-controls">
+            <div class="volume-control">
+                <label for="micVolume">🎤 Mic:</label>
+                <input type="range" id="micVolume" min="0" max="200" value="100">
+                <span id="micVolumeLabel">100%</span>
+            </div>
+            <div class="volume-control">
+                <label for="tabVolume">🔊 Tab:</label>
+                <input type="range" id="tabVolume" min="0" max="200" value="100">
+                <span id="tabVolumeLabel">100%</span>
+            </div>
+        </div>
+
+        <div class="recordings-list">
+            <h3>Recordings</h3>
+            <div id="recordingsList" class="list"></div>
+        </div>
+
+        <div class="info">
+            <p>💡 Open your meeting tab FIRST, then click Record</p>
+            <p>🔇 Noise filtering: Hum removal, hiss removal, voice boost</p>
+            <p>📁 Auto-saved to Downloads/Audio_Recordings/</p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
