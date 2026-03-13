@@ -19,6 +19,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  role: {
+    type: String,
+    enum: ['organization', 'technical', 'non-technical'],
+    default: 'non-technical'
+  },
+  organizationEmail: {
+    type: String
+  },
   createdAt: {
     type: Date,
     default: Date.now

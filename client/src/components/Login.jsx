@@ -120,8 +120,8 @@ const Login = () => {
         <div className="w-full max-w-[440px] space-y-10">
           
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-[#0C1A15] tracking-tight font-syne">Welcome Back</h1>
-            <p className="text-[#7A9489] font-medium">Please enter your details to sign in.</p>
+            <h1 className="text-4xl font-bold text-[#0C1A15] tracking-tight font-syne">Organization / User Sign In</h1>
+            <p className="text-[#7A9489] font-medium">Enter your credentials to access your dashboard.</p>
           </div>
 
           {error && (

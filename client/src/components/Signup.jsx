@@ -7,7 +7,9 @@ const Signup = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'technical',
+    organizationEmail: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,13 +57,24 @@ const Signup = () => {
       return;
     }
 
+    if (!formData.role) {
+      setError('Please select a role.');
+      return;
+    }
+    if (!formData.organizationEmail) {
+      setError('Please provide organization email.');
+      return;
+    }
+
     setLoading(true);
     try {
       await signup(
         formData.name,
         formData.email,
         formData.password,
-        formData.confirmPassword
+        formData.confirmPassword,
+        formData.role,
+        formData.organizationEmail
       );
       navigate('/dashboard');
     } catch (err) {
@@ -260,6 +273,41 @@ const Signup = () => {
                 placeholder="••••••••"
                 className="w-full bg-white border border-[#D4E0DA] rounded-xl px-4 py-3 text-[#0C1A15] placeholder-[#8FA89F] focus:outline-none transition-all duration-300 text-sm focus:ring-4 focus:ring-[#B45309]/5"
                 style={{ borderColor: focused === 'confirmPassword' ? '#B45309' : '#D4E0DA' }}
+                required
+              />
+            </div>
+
+            {/* Role */}
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-[#3D5249] ml-1">Role</label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                onFocus={() => setFocused('role')}
+                onBlur={() => setFocused('')}
+                className="w-full bg-white border border-[#D4E0DA] rounded-xl px-4 py-3 text-[#0C1A15] focus:outline-none transition-all duration-300 text-sm focus:ring-4 focus:ring-[#B45309]/5"
+                style={{ borderColor: focused === 'role' ? '#B45309' : '#D4E0DA' }}
+                required
+              >
+                <option value="technical">Technical User</option>
+                <option value="non-technical">Non-Technical User</option>
+              </select>
+            </div>
+
+            {/* Organization Email */}
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-[#3D5249] ml-1">Organization Email</label>
+              <input
+                type="email"
+                name="organizationEmail"
+                value={formData.organizationEmail}
+                onChange={handleChange}
+                onFocus={() => setFocused('organizationEmail')}
+                onBlur={() => setFocused('')}
+                placeholder="bob@gmail.com"
+                className="w-full bg-white border border-[#D4E0DA] rounded-xl px-4 py-3 text-[#0C1A15] placeholder-[#8FA89F] focus:outline-none transition-all duration-300 text-sm focus:ring-4 focus:ring-[#B45309]/5"
+                style={{ borderColor: focused === 'organizationEmail' ? '#B45309' : '#D4E0DA' }}
                 required
               />
             </div>

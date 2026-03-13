@@ -1,21 +1,33 @@
 import express from 'express';
 import authMiddleware from '../middleware/auth.js';
 import Settings from '../models/Settings.js';
+import User from '../models/User.js';
 import githubAgent from '../agents/githubAgent.js';
 
 const router = express.Router();
 
 /**
- * Get user settings
+ * Get user settings or organization settings if user is not organization
  */
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    let settings = await Settings.findOne({ userId: req.user.id });
+    const user = await User.findById(req.user.id);
+    
+    // If user is not organization, get organization's settings
+    let userId = req.user.id;
+    if (user && user.role !== 'organization') {
+      const organization = await User.findOne({ email: user.organizationEmail, role: 'organization' });
+      if (organization) {
+        userId = organization._id;
+      }
+    }
+
+    let settings = await Settings.findOne({ userId });
 
     // Create default settings if they don't exist
     if (!settings) {
       settings = new Settings({
-        userId: req.user.id,
+        userId,
       });
       await settings.save();
     }
@@ -58,10 +70,20 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update GitHub settings
+ * Update GitHub settings - Only organization users can update
  */
 router.put('/github', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { token, repositoryUrl } = req.body;
 
     if (!token || !repositoryUrl) {
@@ -122,10 +144,20 @@ router.put('/github', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update preferences
+ * Update preferences - Only organization users can update
  */
 router.put('/preferences', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { autoCreateGitHubIssues, notifyOnIssueCreation } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
@@ -161,10 +193,20 @@ router.put('/preferences', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update contacts (for email routing)
+ * Update contacts (for email routing) - Only organization users can update
  */
 router.put('/contacts', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { contacts } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
@@ -193,10 +235,20 @@ router.put('/contacts', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update Google Calendar settings
+ * Update Google Calendar settings - Only organization users can update
  */
 router.put('/google-calendar', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { accessToken, clientId, clientSecret, refreshToken, calendarId } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
@@ -240,10 +292,20 @@ router.put('/google-calendar', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update Trello settings
+ * Update Trello settings - Only organization users can update
  */
 router.put('/trello', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { apiKey, apiToken, listId } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
@@ -278,10 +340,20 @@ router.put('/trello', authMiddleware, async (req, res) => {
 });
 
 /**
- * Update Notion settings
+ * Update Notion settings - Only organization users can update
  */
 router.put('/notion', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     const { apiKey, databaseId } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
@@ -313,10 +385,20 @@ router.put('/notion', authMiddleware, async (req, res) => {
 });
 
 /**
- * Clear GitHub settings
+ * Clear GitHub settings - Only organization users can delete
  */
 router.delete('/github', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    
+    // Only organization users can update settings
+    if (!user || user.role !== 'organization') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only organization users can update settings',
+      });
+    }
+
     let settings = await Settings.findOne({ userId: req.user.id });
 
     if (settings) {

@@ -47,7 +47,14 @@ const Dashboard = () => {
   useEffect(() => {
     fetchAvailableData();
     fetchGitHubSettings();
-  }, []);
+    
+    // Set default tab based on user role
+    if (user?.role === 'non-technical') {
+      setActiveTab('nonTechnical');
+    } else {
+      setActiveTab('technical');
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     if (processingData && !showIssueConfirmation && !showPRConfirmation && !showEmailConfirmation && !showEventConfirmation && !showTrelloConfirmation && !showNotionConfirmation) {
@@ -134,6 +141,7 @@ const Dashboard = () => {
 
   const handleCreateGitHubIssues = async () => {
     if (!githubSettings?.validated) { setError('GitHub is not configured. Please go to Settings.'); return; }
+    if (user?.role !== 'technical' && user?.role !== 'organization') { setError('Only technical users can create GitHub issues'); return; }
     if (!processedData?.technical?.analysis) { setError('No technical analysis available'); return; }
     try {
       setProcessingData(true);
@@ -176,6 +184,7 @@ const Dashboard = () => {
 
   const handleExtractAndCreatePRs = async () => {
     if (!githubSettings?.validated) { setError('GitHub not configured.'); return; }
+    if (user?.role !== 'technical' && user?.role !== 'organization') { setError('Only technical users can create pull requests'); return; }
     if (!processedData?.technical?.analysis) { setError('No technical analysis'); return; }
     try {
       setProcessingData(true);
@@ -303,6 +312,9 @@ const Dashboard = () => {
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
+  // All users can process any meeting - role only affects what they see in results
+  const allowedCategories = user?.role === 'organization' ? ['technical', 'non-technical'] : (user?.role === 'technical' ? ['technical'] : ['non-technical']);
+
   const formatAnalysis = (text) => text ? text.split('\n').filter(l => l.trim()) : [];
 
   const pipelineSteps = [
@@ -422,8 +434,8 @@ const Dashboard = () => {
     },
   ];
 
-  const techIntegrations = integrations.filter(i => i.category === 'technical' && i.show);
-  const bizIntegrations = integrations.filter(i => i.category === 'business' && i.show);
+  const techIntegrations = integrations.filter(i => i.category === 'technical' && i.show && (user?.role === 'organization' || user?.role === 'technical'));
+  const bizIntegrations = integrations.filter(i => i.category === 'business' && i.show && (user?.role === 'organization' || user?.role === 'non-technical'));
 
   const selectedIssueCount = Object.values(selectedIssues).filter(Boolean).length;
   const selectedPRCount = Object.values(selectedPRs).filter(Boolean).length;
@@ -498,7 +510,7 @@ const Dashboard = () => {
             </div>
             <div>
               <h1 className="text-white text-lg font-semibold tracking-tight">Meeting.AI</h1>
-              <p className="text-[#8FA89F] text-xs mt-0.5">{user?.name}</p>
+              <p className="text-[#8FA89F] text-xs mt-0.5">{user?.name} <span className="font-bold text-[#B45309]">({user?.role})</span></p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -508,12 +520,14 @@ const Dashboard = () => {
                 <span className="text-[#15803D] text-xs font-medium">GitHub Connected</span>
               </div>
             )}
-            <button onClick={() => navigate('/settings')} className="text-[#8FA89F] hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all">
-              <svg className="w-4 h-4 inline mr-1.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-              Settings
-            </button>
+            {user?.role === 'organization' && (
+              <button onClick={() => navigate('/settings')} className="text-[#8FA89F] hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all">
+                <svg className="w-4 h-4 inline mr-1.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Settings
+              </button>
+            )}
             <button onClick={handleLogout} className="text-[#B91C1C]/70 hover:text-[#B91C1C] text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#B91C1C]/5 transition-all">
               Logout
             </button>

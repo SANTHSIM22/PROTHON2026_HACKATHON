@@ -8,10 +8,10 @@ const router = express.Router();
 // Sign Up
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const { name, email, password, confirmPassword, role, organizationEmail } = req.body;
 
     // Validation
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword || !role || !organizationEmail) {
       return res.status(400).json({ message: 'Please fill all fields' });
     }
 
@@ -23,6 +23,16 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
+    if (role === 'organization') {
+      return res.status(403).json({ message: 'Cannot sign up as organization' });
+    }
+
+    // Check if organization email exists and is an organization
+    const organizationUser = await User.findOne({ email: organizationEmail, role: 'organization' });
+    if (!organizationUser) {
+      return res.status(400).json({ message: 'Invalid organization email. Organization not found.' });
+    }
+
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -30,7 +40,7 @@ router.post('/signup', async (req, res) => {
     }
 
     // Create new user
-    const user = new User({ name, email, password });
+    const user = new User({ name, email, password, role, organizationEmail });
     await user.save();
 
     // Create JWT token
@@ -44,7 +54,9 @@ router.post('/signup', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        role: user.role,
+        organizationEmail: user.organizationEmail
       }
     });
   } catch (error) {
@@ -86,7 +98,9 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        role: user.role,
+        organizationEmail: user.organizationEmail
       }
     });
   } catch (error) {
