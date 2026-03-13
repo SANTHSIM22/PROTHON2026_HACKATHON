@@ -23,6 +23,24 @@ const Settings = () => {
   const [autoCreateIssues, setAutoCreateIssues] = useState(false);
   const [notifyOnCreation, setNotifyOnCreation] = useState(true);
 
+  // Contacts
+  const [contacts, setContacts] = useState([]);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+
+  // Trello settings
+  const [trelloApiKey, setTrelloApiKey] = useState('');
+  const [trelloApiToken, setTrelloApiToken] = useState('');
+  const [trelloListId, setTrelloListId] = useState('');
+
+  // Notion settings
+  const [notionApiKey, setNotionApiKey] = useState('');
+  const [notionDatabaseId, setNotionDatabaseId] = useState('');
+
+  // Google Calendar
+  const [calendarToken, setCalendarToken] = useState('');
+  const [calendarId, setCalendarId] = useState('primary');
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -49,6 +67,26 @@ const Settings = () => {
 
       setAutoCreateIssues(settings.preferences.autoCreateGitHubIssues);
       setNotifyOnCreation(settings.preferences.notifyOnIssueCreation);
+      setContacts(settings.contacts || []);
+
+      if (settings.googleCalendar) {
+        setCalendarId(settings.googleCalendar.calendarId || 'primary');
+        if (settings.googleCalendar.accessToken === '••••••••') {
+          setCalendarToken('••••••••');
+        }
+      }
+
+      if (settings.trello) {
+        setTrelloListId(settings.trello.listId || '');
+        if (settings.trello.apiKey === '••••••••') setTrelloApiKey('••••••••');
+        if (settings.trello.apiToken === '••••••••') setTrelloApiToken('••••••••');
+      }
+
+      if (settings.notion) {
+        setNotionDatabaseId(settings.notion.databaseId || '');
+        if (settings.notion.apiKey === '••••••••') setNotionApiKey('••••••••');
+      }
+
       setError('');
     } catch (err) {
       setError('Failed to load settings');
@@ -117,6 +155,57 @@ const Settings = () => {
     }
   };
 
+  const handleSaveTrello = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      await axios.put(
+        'http://localhost:5000/api/settings/trello',
+        {
+          apiKey: trelloApiKey === '••••••••' ? undefined : trelloApiKey,
+          apiToken: trelloApiToken === '••••••••' ? undefined : trelloApiToken,
+          listId: trelloListId,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Trello settings saved successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save Trello settings');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotion = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      await axios.put(
+        'http://localhost:5000/api/settings/notion',
+        {
+          apiKey: notionApiKey === '••••••••' ? undefined : notionApiKey,
+          databaseId: notionDatabaseId,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Notion settings saved successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save Notion settings');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleClearGitHub = async () => {
     if (!confirm('Are you sure you want to clear GitHub settings?')) {
       return;
@@ -139,6 +228,67 @@ const Settings = () => {
       setSuccess('GitHub settings cleared');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to clear GitHub settings');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddContact = () => {
+    if (!newContactName.trim() || !newContactEmail.trim()) {
+      setError('Please provide both name and email');
+      return;
+    }
+    setContacts(prev => [...prev, { name: newContactName.trim(), emailAddress: newContactEmail.trim() }]);
+    setNewContactName('');
+    setNewContactEmail('');
+  };
+
+  const handleRemoveContact = (indexToRemove) => {
+    setContacts(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleSaveContacts = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        'http://localhost:5000/api/settings/contacts',
+        { contacts },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Contacts saved successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save contacts');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveCalendar = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        'http://localhost:5000/api/settings/google-calendar',
+        { accessToken: calendarToken, calendarId: calendarId || 'primary' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.googleCalendar.accessToken === '••••••••') {
+        setCalendarToken('••••••••');
+      }
+      setSuccess('Google Calendar settings saved successfully');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save Google Calendar settings');
       console.error(err);
     } finally {
       setSaving(false);
@@ -285,8 +435,246 @@ const Settings = () => {
           </div>
         </div>
 
+        {/* Google Calendar Settings */}
+        <div className="bg-white rounded-lg shadow p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Google Calendar</h2>
+              <p className="text-gray-600 mt-1">Configure credentials to schedule extracted events.</p>
+            </div>
+            <div className="text-3xl">
+              <span>📅</span>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Google OAuth / Service Account Access Token
+              </label>
+              <input
+                type="password"
+                placeholder="ya29.a0A..."
+                value={calendarToken}
+                onChange={(e) => setCalendarToken(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-gray-600 text-xs mt-2">
+                Your temporary Google OAuth Token or generic proxy token.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Calendar ID
+              </label>
+              <input
+                type="text"
+                placeholder="primary"
+                value={calendarId}
+                onChange={(e) => setCalendarId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-gray-600 text-xs mt-2">
+                Usually 'primary' for your default calendar, or a specific Calendar ID.
+              </p>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={handleSaveCalendar}
+                disabled={saving || !calendarToken}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
+              >
+                {saving ? 'Saving...' : 'Save Calendar Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Trello Integration Settings */}
+        <div className="bg-white rounded-lg shadow p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Trello Integration</h2>
+              <p className="text-gray-600 mt-1">Configure Trello for automatic card creation</p>
+            </div>
+            <div className="text-3xl">
+              <span>📋</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trello API Key *
+              </label>
+              <input
+                type="text"
+                placeholder="Enter Trello API Key"
+                value={trelloApiKey}
+                onChange={(e) => setTrelloApiKey(e.target.value)}
+                disabled={trelloApiKey === '••••••••'}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trello API Token *
+              </label>
+              <input
+                type="password"
+                placeholder="Enter Trello API Token"
+                value={trelloApiToken}
+                onChange={(e) => setTrelloApiToken(e.target.value)}
+                disabled={trelloApiToken === '••••••••'}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trello List ID *
+              </label>
+              <input
+                type="text"
+                placeholder="Enter the ID of the Trello List to add cards to"
+                value={trelloListId}
+                onChange={(e) => setTrelloListId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={handleSaveTrello}
+                disabled={saving || !trelloApiKey || !trelloApiToken || !trelloListId}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
+              >
+                {saving ? 'Saving...' : 'Save Trello Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Notion Integration Settings */}
+        <div className="bg-white rounded-lg shadow p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Notion Integration</h2>
+              <p className="text-gray-600 mt-1">Configure Notion to auto-generate meeting summaries</p>
+            </div>
+            <div className="text-3xl">
+              <span>📓</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notion Internal Integration Token (API Key) *
+              </label>
+              <input
+                type="password"
+                placeholder="secret_xxxxxxxxxxxx"
+                value={notionApiKey}
+                onChange={(e) => setNotionApiKey(e.target.value)}
+                disabled={notionApiKey === '••••••••'}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notion Database ID *
+              </label>
+              <input
+                type="text"
+                placeholder="Enter Database ID"
+                value={notionDatabaseId}
+                onChange={(e) => setNotionDatabaseId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button
+                onClick={handleSaveNotion}
+                disabled={saving || !notionApiKey || !notionDatabaseId}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
+              >
+                {saving ? 'Saving...' : 'Save Notion Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Contacts (Email Routing) */}
+        <div className="bg-white rounded-lg shadow p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">Email Contacts</h2>
+              <p className="text-gray-600 mt-1">Configure email routing by mapping names from transcripts</p>
+            </div>
+            <div className="text-3xl">
+              <span>📧</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {contacts.map((contact, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
+                <div>
+                  <p className="font-semibold text-gray-800">{contact.name}</p>
+                  <p className="text-sm text-gray-600">{contact.emailAddress}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveContact(idx)}
+                  className="text-red-500 hover:text-red-700 font-semibold text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+
+            <div className="flex gap-4 mt-4">
+              <input
+                type="text"
+                placeholder="Name (e.g., John)"
+                value={newContactName}
+                onChange={(e) => setNewContactName(e.target.value)}
+                className="w-1/3 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={newContactEmail}
+                onChange={(e) => setNewContactEmail(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={handleAddContact}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="pt-4">
+              <button
+                onClick={handleSaveContacts}
+                disabled={saving}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
+              >
+                {saving ? 'Saving...' : 'Save Contacts'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Preferences */}
-        <div className="bg-white rounded-lg shadow p-8">
+        <div className="bg-white rounded-lg shadow p-8 mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Preferences</h2>
 
           <div className="space-y-4">
