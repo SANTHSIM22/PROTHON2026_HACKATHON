@@ -33,6 +33,30 @@ const settingsSchema = new mongoose.Schema({
       type: Date,
       default: null,
     },
+  },  contacts: [{
+    name: {
+      type: String,
+      required: true
+    },
+    emailAddress: {
+      type: String,
+      required: true
+    }
+  }],
+  googleCalendar: {
+    accessToken: {
+      type: String,
+      default: null,
+    },
+    calendarId: {
+      type: String,
+      default: 'primary',
+    }
+  },
+  trello: {
+    apiKey: { type: String, default: null },
+    apiToken: { type: String, default: null },
+    listId: { type: String, default: null },
   },
   preferences: {
     autoCreateGitHubIssues: {
