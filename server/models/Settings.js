@@ -53,6 +53,11 @@ const settingsSchema = new mongoose.Schema({
       default: 'primary',
     }
   },
+  trello: {
+    apiKey: { type: String, default: null },
+    apiToken: { type: String, default: null },
+    listId: { type: String, default: null },
+  },
   preferences: {
     autoCreateGitHubIssues: {
       type: Boolean,

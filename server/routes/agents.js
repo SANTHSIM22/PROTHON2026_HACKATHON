@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { rootAgent, agentMemory, githubAgent, nonTechnicalAgent, emailAgent, calendarAgent } from '../agents/index.js';
+import trelloAgent from '../agents/trelloAgent.js';
 import authMiddleware from '../middleware/auth.js';
 import Meeting from '../models/Meeting.js';
 import Settings from '../models/Settings.js';
@@ -926,6 +927,110 @@ router.post('/create-calendar-events', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating calendar events:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Trello Agents
+router.post('/extract-trello-cards', authMiddleware, async (req, res) => {
+  try {
+    const { dataIndex } = req.body;
+
+    const dataPath = path.join(__dirname, '../data/data1.json');
+    const rawData = fs.readFileSync(dataPath, 'utf8');
+    const parsedData = JSON.parse(rawData);
+    // Since we changed data1.json to have a "meetings" root property, unpack it safely
+    const meetings = parsedData.meetings || parsedData; 
+
+    if (dataIndex === undefined || !meetings[dataIndex]) {
+      return res.status(400).json({ success: false, error: 'Invalid data index' });
+    }
+
+    const transcript = meetings[dataIndex].transcript;
+    const cards = await trelloAgent.extractCards(transcript);
+
+    return res.json({
+      success: true,
+      cards: cards || [],
+      cardsFound: cards ? cards.length : 0,
+    });
+  } catch (error) {
+    console.error('Error extracting Trello cards:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/create-trello-cards', authMiddleware, async (req, res) => {
+  try {
+    const { cards } = req.body;
+
+    if (!cards || cards.length === 0) {
+      return res.status(400).json({ success: false, error: 'No cards provided' });
+    }
+
+    const settings = await Settings.findOne({ userId: req.user.id });
+    const trelloKey = settings?.trello?.apiKey;
+    const trelloToken = settings?.trello?.apiToken;
+    const listId = settings?.trello?.listId;
+
+    if (!trelloKey || !trelloToken || !listId) {
+       const results = cards.map(card => ({
+        ...card,
+        success: true,
+        message: `(Mock) Trello Card '${card.name}' created`,
+        status: 'created'
+      }));
+
+      return res.json({
+        success: true,
+        successCount: results.length,
+        failureCount: 0,
+        results,
+        note: 'Mocked locally. Add Trello Credentials in Settings to sync to a real Trello board.'
+      });
+    }
+
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const card of cards) {
+      try {
+        const queryParams = new URLSearchParams({
+          key: trelloKey,
+          token: trelloToken,
+          idList: listId,
+          name: card.name,
+          desc: card.desc || '',
+        });
+
+        const response = await fetch(`https://api.trello.com/1/cards?${queryParams.toString()}`, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+           throw new Error(data.message || 'Trello API Error');
+        }
+
+        successCount++;
+        results.push({ ...card, success: true, url: data.url });
+      } catch (err) {
+        failureCount++;
+        results.push({ ...card, success: false, error: err.message });
+      }
+    }
+
+    return res.json({
+      success: true,
+      successCount,
+      failureCount,
+      results
+    });
+  } catch (error) {
+    console.error('Error creating Trello cards:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
