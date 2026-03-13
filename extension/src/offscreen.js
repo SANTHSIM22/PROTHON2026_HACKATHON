@@ -1,12 +1,10 @@
 /*
  * offscreen.js — MeetRec Offscreen Document
  *
- * Handles:
- *  - Tab audio capture via stream ID
- *  - Microphone capture (matching Google Meet's selected device)
- *  - Merging both streams
- *  - MediaRecorder + MP3 encoding via lamejs
- *  - Download trigger
+ * Captures tab audio via tabCapture stream ID.
+ * Receives mic PCM data from content script (via background).
+ * Merges both into a single stream using AudioContext.
+ * Records with MediaRecorder → encodes to MP3 → downloads.
  */
 
 (function () {
@@ -16,199 +14,155 @@
   let recordedChunks = [];
   let audioContext = null;
   let tabStream = null;
-  let micStream = null;
   let destinationNode = null;
   let isRecording = false;
-  let micDeviceId = null;
 
-  /* ─────────────── Enumerate audio devices ─────────────── */
+  // Mic PCM buffering
+  let micBufferSource = null;
+  let micGainNode = null;
+  let micSampleRate = 44100;
+  let micPcmQueue = [];
+  let micProcessorInterval = null;
+  let micScriptNode = null;
 
-  async function findAllMicrophones() {
-    try {
-      // We need to call getUserMedia first to get permission
-      // then enumerate to see device labels
-      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      tempStream.getTracks().forEach(t => t.stop());
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const mics = devices.filter(d => d.kind === 'audioinput');
-
-      console.log('[MeetRec offscreen] Available microphones:');
-      mics.forEach((m, i) => {
-        console.log(`  [${i}] ${m.label} (${m.deviceId})`);
-      });
-
-      return mics;
-    } catch (err) {
-      console.error('[MeetRec offscreen] Cannot enumerate devices:', err);
-      return [];
-    }
-  }
-
-  /* ─────────────── Capture tab audio ─────────────── */
+  /* ────────── Capture tab audio ────────── */
 
   async function captureTabAudio(tabStreamId) {
-    try {
-      console.log('[MeetRec offscreen] Capturing tab audio...');
+    console.log('[offscreen] Capturing tab audio...');
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          mandatory: {
-            chromeMediaSource: 'tab',
-            chromeMediaSourceId: tabStreamId,
-          },
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: {
+          chromeMediaSource: 'tab',
+          chromeMediaSourceId: tabStreamId,
         },
-        video: false,
-      });
+      },
+      video: false,
+    });
 
-      tabStream = stream;
-      console.log('[MeetRec offscreen] Tab audio captured:',
-        stream.getAudioTracks().length, 'tracks');
-      return stream;
+    tabStream = stream;
 
-    } catch (err) {
-      console.error('[MeetRec offscreen] Tab capture failed:', err);
-      throw err;
+    const tracks = stream.getAudioTracks();
+    console.log('[offscreen] ✅ Tab audio:', tracks.length, 'tracks');
+    if (tracks[0]) {
+      console.log('[offscreen]   Label:', tracks[0].label);
     }
+
+    return stream;
   }
 
-  /* ─────────────── Capture microphone ─────────────── */
+  /* ────────── Set up audio merger ────────── */
 
-  async function captureMicrophone(preferredDeviceId) {
-    try {
-      console.log('[MeetRec offscreen] Capturing microphone...');
-
-      const audioConstraints = {
-        // CRITICAL: disable echo cancellation and noise suppression
-        // because Google Meet is already applying these
-        // Having two layers of processing destroys the audio
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        // If we know which device Meet is using, use that exact one
-      };
-
-      if (preferredDeviceId && preferredDeviceId !== 'default') {
-        audioConstraints.deviceId = { exact: preferredDeviceId };
-        console.log('[MeetRec offscreen] Using specific mic device:', preferredDeviceId);
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints,
-        video: false,
-      });
-
-      micStream = stream;
-
-      // Log which device we actually got
-      const track = stream.getAudioTracks()[0];
-      const settings = track.getSettings();
-      console.log('[MeetRec offscreen] Microphone captured:');
-      console.log('  Label:', track.label);
-      console.log('  Device ID:', settings.deviceId);
-      console.log('  Sample Rate:', settings.sampleRate);
-      console.log('  Channel Count:', settings.channelCount);
-
-      return stream;
-
-    } catch (err) {
-      console.warn('[MeetRec offscreen] Mic capture failed:', err.message);
-      return null;
-    }
-  }
-
-  /* ─────────── Try to detect which mic Google Meet uses ─────────── */
-
-  async function detectMeetMicrophone() {
-    /*
-     * Strategy: Google Meet stores the selected audio device in localStorage
-     * on the meet.google.com domain. We can't access that from here, but
-     * the content script can read it and send it to us.
-     *
-     * Fallback: try each available microphone and use whichever one
-     * is currently active (has audio signal).
-     *
-     * Simplest reliable approach: enumerate all mics and prefer
-     * the one that is NOT the default communications device,
-     * because users often select a specific headset in Meet.
-     */
-
-    const mics = await findAllMicrophones();
-
-    if (mics.length === 0) {
-      console.warn('[MeetRec offscreen] No microphones found');
-      return null;
-    }
-
-    if (mics.length === 1) {
-      console.log('[MeetRec offscreen] Only one mic available, using it');
-      return mics[0].deviceId;
-    }
-
-    // If we received a specific device ID from content script, use that
-    if (micDeviceId) {
-      console.log('[MeetRec offscreen] Using device ID from content script:', micDeviceId);
-      return micDeviceId;
-    }
-
-    // Fallback: use default
-    console.log('[MeetRec offscreen] Multiple mics found, using default');
-    return null;
-  }
-
-  /* ─────────────── Merge streams ─────────────── */
-
-  function mergeStreams(tab, mic) {
+  function setupMerger(tabAudioStream) {
     audioContext = new AudioContext({ sampleRate: 44100 });
     destinationNode = audioContext.createMediaStreamDestination();
 
-    if (tab && tab.getAudioTracks().length > 0) {
-      try {
-        const tabSource = audioContext.createMediaStreamSource(tab);
-
-        // Add gain control for tab audio
-        const tabGain = audioContext.createGain();
-        tabGain.gain.value = 1.0;
-        tabSource.connect(tabGain);
-        tabGain.connect(destinationNode);
-
-        console.log('[MeetRec offscreen] Tab audio connected (gain: 1.0)');
-      } catch (err) {
-        console.error('[MeetRec offscreen] Failed to connect tab audio:', err);
-      }
+    // Connect tab audio
+    if (tabAudioStream && tabAudioStream.getAudioTracks().length > 0) {
+      const tabSource = audioContext.createMediaStreamSource(tabAudioStream);
+      const tabGain = audioContext.createGain();
+      tabGain.gain.value = 1.0;
+      tabSource.connect(tabGain);
+      tabGain.connect(destinationNode);
+      console.log('[offscreen] ✅ Tab audio connected (gain: 1.0)');
     }
 
-    if (mic && mic.getAudioTracks().length > 0) {
-      try {
-        const micSource = audioContext.createMediaStreamSource(mic);
+    // Set up mic PCM playback node
+    // We use a ScriptProcessorNode that reads from our PCM queue
+    const bufferSize = 4096;
+    micScriptNode = audioContext.createScriptProcessor(bufferSize, 1, 1);
 
-        // BOOST microphone volume since tab capture tends to be louder
-        const micGain = audioContext.createGain();
-        micGain.gain.value = 1.5; // Boost mic by 50%
-        micSource.connect(micGain);
-        micGain.connect(destinationNode);
+    micGainNode = audioContext.createGain();
+    micGainNode.gain.value = 2.5; // Boost mic significantly
 
-        console.log('[MeetRec offscreen] Microphone connected (gain: 1.5 boosted)');
-      } catch (err) {
-        console.error('[MeetRec offscreen] Failed to connect mic audio:', err);
+    micScriptNode.onaudioprocess = function (event) {
+      const output = event.outputBuffer.getChannelData(0);
+
+      if (micPcmQueue.length > 0) {
+        const chunk = micPcmQueue.shift();
+
+        // Copy PCM data to output, handling size differences
+        const copyLength = Math.min(chunk.length, output.length);
+        for (let i = 0; i < copyLength; i++) {
+          output[i] = chunk[i];
+        }
+        // Fill rest with silence
+        for (let i = copyLength; i < output.length; i++) {
+          output[i] = 0;
+        }
+      } else {
+        // No mic data available, output silence
+        for (let i = 0; i < output.length; i++) {
+          output[i] = 0;
+        }
       }
-    }
+    };
+
+    // Connect mic processor through gain to destination
+    micScriptNode.connect(micGainNode);
+    micGainNode.connect(destinationNode);
+
+    console.log('[offscreen] ✅ Mic PCM processor connected (gain: 2.5)');
+    console.log('[offscreen] ✅ Audio merger ready');
 
     return destinationNode.stream;
   }
 
-  /* ─────────────── Start MediaRecorder ─────────────── */
+  /* ────────── Receive mic PCM data ────────── */
+
+  function receiveMicPCM(pcmArray, sampleRate) {
+    if (!isRecording) return;
+
+    // Convert array back to Float32Array
+    const pcm = new Float32Array(pcmArray);
+
+    // If sample rates differ, we need to resample
+    if (sampleRate && sampleRate !== 44100) {
+      const resampled = resample(pcm, sampleRate, 44100);
+      micPcmQueue.push(resampled);
+    } else {
+      micPcmQueue.push(pcm);
+    }
+
+    // Prevent queue from growing too large (max ~5 seconds)
+    while (micPcmQueue.length > 50) {
+      micPcmQueue.shift();
+    }
+  }
+
+  /* ────────── Simple linear resampling ────────── */
+
+  function resample(input, fromRate, toRate) {
+    if (fromRate === toRate) return input;
+
+    const ratio = fromRate / toRate;
+    const outputLength = Math.round(input.length / ratio);
+    const output = new Float32Array(outputLength);
+
+    for (let i = 0; i < outputLength; i++) {
+      const srcIndex = i * ratio;
+      const srcIndexFloor = Math.floor(srcIndex);
+      const srcIndexCeil = Math.min(srcIndexFloor + 1, input.length - 1);
+      const frac = srcIndex - srcIndexFloor;
+
+      output[i] = input[srcIndexFloor] * (1 - frac) + input[srcIndexCeil] * frac;
+    }
+
+    return output;
+  }
+
+  /* ────────── Start MediaRecorder ────────── */
 
   function startMediaRecorder(stream) {
     recordedChunks = [];
+    micPcmQueue = [];
+
+    const tracks = stream.getAudioTracks();
+    console.log('[offscreen] Recording stream:', tracks.length, 'tracks');
 
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/ogg';
-
-    console.log('[MeetRec offscreen] MediaRecorder MIME:', mimeType);
+      : 'audio/webm';
 
     mediaRecorder = new MediaRecorder(stream, {
       mimeType: mimeType,
@@ -222,33 +176,38 @@
     };
 
     mediaRecorder.onstop = async () => {
-      console.log('[MeetRec offscreen] MediaRecorder stopped, chunks:', recordedChunks.length);
+      console.log('[offscreen] MediaRecorder stopped');
+      console.log('[offscreen] Chunks:', recordedChunks.length);
+
+      const totalBytes = recordedChunks.reduce((s, c) => s + c.size, 0);
+      console.log('[offscreen] Raw size:', (totalBytes / 1024).toFixed(1), 'KB');
+
       await encodeMp3AndDownload();
       cleanup();
     };
 
     mediaRecorder.onerror = (event) => {
-      console.error('[MeetRec offscreen] MediaRecorder error:', event.error);
+      console.error('[offscreen] MediaRecorder error:', event.error);
       chrome.runtime.sendMessage({
         type: 'RECORDING_ERROR',
-        error: event.error ? event.error.message : 'MediaRecorder error',
+        error: event.error ? event.error.message : 'Recording error',
       });
     };
 
     mediaRecorder.start(1000);
     isRecording = true;
-    console.log('[MeetRec offscreen] Recording started');
+    console.log('[offscreen] ✅ Recording started');
+    console.log('[offscreen] ✅ Waiting for mic PCM data from content script...');
   }
 
-  /* ─────────────── MP3 encoding ─────────────── */
+  /* ────────── MP3 encoding ────────── */
 
   async function encodeMp3AndDownload() {
     try {
       if (recordedChunks.length === 0) {
-        console.warn('[MeetRec offscreen] No audio chunks to encode');
         chrome.runtime.sendMessage({
           type: 'RECORDING_ERROR',
-          error: 'No audio data was captured',
+          error: 'No audio data captured',
         });
         return;
       }
@@ -256,45 +215,44 @@
       const webmBlob = new Blob(recordedChunks, {
         type: recordedChunks[0].type || 'audio/webm',
       });
-      console.log('[MeetRec offscreen] WebM size:', (webmBlob.size / 1024).toFixed(1), 'KB');
+
+      console.log('[offscreen] WebM:', (webmBlob.size / 1024 / 1024).toFixed(2), 'MB');
 
       const arrayBuffer = await webmBlob.arrayBuffer();
-      const decodeContext = new AudioContext({ sampleRate: 44100 });
+      const decodeCtx = new AudioContext({ sampleRate: 44100 });
 
       let audioBuffer;
       try {
-        audioBuffer = await decodeContext.decodeAudioData(arrayBuffer);
-      } catch (decodeErr) {
-        console.error('[MeetRec offscreen] Decode failed, downloading as webm:', decodeErr);
+        audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+      } catch (err) {
+        console.error('[offscreen] Decode failed, saving WebM:', err);
         downloadBlob(webmBlob, 'webm');
-        decodeContext.close();
+        decodeCtx.close();
         return;
       }
 
-      decodeContext.close();
+      decodeCtx.close();
 
-      console.log('[MeetRec offscreen] Decoded:', {
-        duration: audioBuffer.duration.toFixed(2) + 's',
-        sampleRate: audioBuffer.sampleRate,
-        channels: audioBuffer.numberOfChannels,
-      });
+      console.log('[offscreen] Decoded:',
+        audioBuffer.duration.toFixed(2), 's,',
+        audioBuffer.sampleRate, 'Hz,',
+        audioBuffer.numberOfChannels, 'ch');
 
       const mp3Blob = encodeToMp3(audioBuffer);
 
       if (!mp3Blob) {
-        console.warn('[MeetRec offscreen] MP3 encode failed, downloading webm');
         downloadBlob(webmBlob, 'webm');
         return;
       }
 
-      console.log('[MeetRec offscreen] MP3 size:', (mp3Blob.size / 1024).toFixed(1), 'KB');
+      console.log('[offscreen] MP3:', (mp3Blob.size / 1024 / 1024).toFixed(2), 'MB');
       downloadBlob(mp3Blob, 'mp3');
 
     } catch (err) {
-      console.error('[MeetRec offscreen] Encode error:', err);
+      console.error('[offscreen] Encode error:', err);
       chrome.runtime.sendMessage({
         type: 'RECORDING_ERROR',
-        error: 'MP3 encoding failed: ' + (err.message || 'Unknown'),
+        error: 'Encoding failed: ' + err.message,
       });
     }
   }
@@ -302,14 +260,12 @@
   function encodeToMp3(audioBuffer) {
     try {
       if (typeof lamejs === 'undefined') {
-        console.error('[MeetRec offscreen] lamejs not loaded!');
+        console.error('[offscreen] lamejs not loaded');
         return null;
       }
 
       const channels = audioBuffer.numberOfChannels;
       const sampleRate = audioBuffer.sampleRate;
-      const kbps = 128;
-
       const left = audioBuffer.getChannelData(0);
       const right = channels > 1 ? audioBuffer.getChannelData(1) : left;
 
@@ -319,60 +275,52 @@
       const encoder = new lamejs.Mp3Encoder(
         channels >= 2 ? 2 : 1,
         sampleRate,
-        kbps
+        128
       );
 
-      const mp3Parts = [];
-      const blockSize = 1152;
-      const total = leftPCM.length;
+      const parts = [];
+      const block = 1152;
 
-      for (let i = 0; i < total; i += blockSize) {
-        const leftBlock = leftPCM.subarray(i, Math.min(i + blockSize, total));
-        const rightBlock = rightPCM.subarray(i, Math.min(i + blockSize, total));
+      for (let i = 0; i < leftPCM.length; i += block) {
+        const lb = leftPCM.subarray(i, Math.min(i + block, leftPCM.length));
+        const rb = rightPCM.subarray(i, Math.min(i + block, rightPCM.length));
 
-        let buf;
-        if (channels >= 2) {
-          buf = encoder.encodeBuffer(leftBlock, rightBlock);
-        } else {
-          buf = encoder.encodeBuffer(leftBlock);
-        }
+        const buf = channels >= 2
+          ? encoder.encodeBuffer(lb, rb)
+          : encoder.encodeBuffer(lb);
 
-        if (buf.length > 0) {
-          mp3Parts.push(buf);
-        }
+        if (buf.length > 0) parts.push(buf);
       }
 
       const flush = encoder.flush();
-      if (flush.length > 0) {
-        mp3Parts.push(flush);
-      }
+      if (flush.length > 0) parts.push(flush);
 
-      const totalSize = mp3Parts.reduce((sum, p) => sum + p.length, 0);
-      const mp3Array = new Uint8Array(totalSize);
+      const size = parts.reduce((s, p) => s + p.length, 0);
+      const arr = new Uint8Array(size);
       let offset = 0;
-      for (const part of mp3Parts) {
-        mp3Array.set(part, offset);
-        offset += part.length;
+      for (const p of parts) {
+        arr.set(p, offset);
+        offset += p.length;
       }
 
-      return new Blob([mp3Array], { type: 'audio/mp3' });
+      return new Blob([arr], { type: 'audio/mp3' });
 
     } catch (err) {
-      console.error('[MeetRec offscreen] lamejs error:', err);
+      console.error('[offscreen] lamejs error:', err);
       return null;
     }
   }
 
-  function floatTo16BitPCM(float32) {
-    const int16 = new Int16Array(float32.length);
-    for (let i = 0; i < float32.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32[i]));
-      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  function floatTo16BitPCM(f32) {
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) {
+      const s = Math.max(-1, Math.min(1, f32[i]));
+      i16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
-    return int16;
+    return i16;
   }
 
-  /* ─────────────── Download ─────────────── */
+  /* ────────── Download ────────── */
 
   function downloadBlob(blob, ext) {
     const now = new Date();
@@ -397,33 +345,43 @@
     setTimeout(() => {
       URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      console.log('[MeetRec offscreen] Downloaded:', filename);
+      console.log('[offscreen] ✅ Downloaded:', filename);
       chrome.runtime.sendMessage({ type: 'RECORDING_DOWNLOAD_COMPLETE' });
-    }, 1000);
+    }, 1500);
   }
 
-  /* ─────────────── Cleanup ─────────────── */
+  /* ────────── Cleanup ────────── */
 
   function cleanup() {
+    isRecording = false;
+    micPcmQueue = [];
+
+    if (micScriptNode) {
+      micScriptNode.disconnect();
+      micScriptNode.onaudioprocess = null;
+      micScriptNode = null;
+    }
+    if (micGainNode) {
+      micGainNode.disconnect();
+      micGainNode = null;
+    }
     if (tabStream) {
       tabStream.getTracks().forEach(t => t.stop());
       tabStream = null;
-    }
-    if (micStream) {
-      micStream.getTracks().forEach(t => t.stop());
-      micStream = null;
     }
     if (audioContext && audioContext.state !== 'closed') {
       audioContext.close().catch(() => {});
       audioContext = null;
     }
     destinationNode = null;
-    isRecording = false;
     mediaRecorder = null;
     recordedChunks = [];
+    console.log('[offscreen] Cleaned up');
   }
 
-  /* ─────────────── Message listener ─────────────── */
+  /* ────────── Message handler ────────── */
+
+  let micChunksReceived = 0;
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || !message.type) return false;
@@ -433,38 +391,28 @@
       case 'OFFSCREEN_START_RECORDING': {
         (async () => {
           try {
-            console.log('[MeetRec offscreen] === STARTING RECORDING ===');
+            console.log('[offscreen] ═══════════════════════════');
+            console.log('[offscreen] START RECORDING');
+            console.log('[offscreen] ═══════════════════════════');
 
-            // If content script told us which mic Meet is using
-            if (message.micDeviceId) {
-              micDeviceId = message.micDeviceId;
-              console.log('[MeetRec offscreen] Meet mic device:', micDeviceId);
-            }
-
-            // Step 1: Capture tab audio
+            // Capture tab audio
             const tab = await captureTabAudio(message.tabStreamId);
 
-            // Step 2: Detect and capture the right microphone
-            const preferredMic = await detectMeetMicrophone();
-            const mic = await captureMicrophone(preferredMic);
+            // Set up merger (tab audio + mic PCM playback)
+            const merged = setupMerger(tab);
 
-            if (!mic) {
-              console.warn('[MeetRec offscreen] No mic captured — recording tab audio only');
-            }
-
-            // Step 3: Merge
-            const merged = mergeStreams(tab, mic);
-
-            // Step 4: Record
+            // Start recording the merged stream
             startMediaRecorder(merged);
+
+            micChunksReceived = 0;
 
             sendResponse({ success: true });
 
           } catch (err) {
-            console.error('[MeetRec offscreen] Start failed:', err);
+            console.error('[offscreen] Start failed:', err);
             chrome.runtime.sendMessage({
               type: 'RECORDING_ERROR',
-              error: err.message || 'Failed to start recording',
+              error: err.message,
             });
             sendResponse({ success: false, error: err.message });
           }
@@ -473,7 +421,10 @@
       }
 
       case 'OFFSCREEN_STOP_RECORDING': {
-        console.log('[MeetRec offscreen] === STOPPING RECORDING ===');
+        console.log('[offscreen] ═══════════════════════════');
+        console.log('[offscreen] STOP RECORDING');
+        console.log('[offscreen] Mic chunks received:', micChunksReceived);
+        console.log('[offscreen] ═══════════════════════════');
 
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
@@ -487,46 +438,31 @@
         return true;
       }
 
-      case 'OFFSCREEN_SET_MIC_DEVICE': {
-        // Content script detected which mic Meet is using
-        micDeviceId = message.deviceId;
-        console.log('[MeetRec offscreen] Mic device updated:', micDeviceId);
+      case 'OFFSCREEN_MIC_PCM': {
+        // Receive mic PCM data forwarded from content script via background
+        if (message.pcm && isRecording) {
+          receiveMicPCM(message.pcm, message.sampleRate);
+          micChunksReceived++;
 
-        // If already recording, try to add this mic
-        if (isRecording && !micStream && audioContext && destinationNode) {
-          captureMicrophone(micDeviceId).then(mic => {
-            if (mic) {
-              const source = audioContext.createMediaStreamSource(mic);
-              const gain = audioContext.createGain();
-              gain.gain.value = 1.5;
-              source.connect(gain);
-              gain.connect(destinationNode);
-              console.log('[MeetRec offscreen] Late mic connected');
-            }
-          });
+          if (micChunksReceived === 1) {
+            console.log('[offscreen] ✅ First mic PCM chunk received! Mic audio is flowing.');
+          }
+          if (micChunksReceived % 100 === 0) {
+            console.log('[offscreen] Mic chunks received:', micChunksReceived,
+              '| Queue:', micPcmQueue.length);
+          }
         }
-
-        sendResponse({ success: true });
-        return true;
+        return false;
       }
 
-      case 'OFFSCREEN_CAPTURE_MIC_FALLBACK': {
-        (async () => {
-          const preferred = await detectMeetMicrophone();
-          const mic = await captureMicrophone(preferred);
-          if (mic && audioContext && destinationNode) {
-            const source = audioContext.createMediaStreamSource(mic);
-            const gain = audioContext.createGain();
-            gain.gain.value = 1.5;
-            source.connect(gain);
-            gain.connect(destinationNode);
-          }
-        })();
+      case 'OFFSCREEN_MIC_INFO': {
+        micSampleRate = message.sampleRate || 44100;
+        console.log('[offscreen] Mic info:', message.label, '@', micSampleRate, 'Hz');
         return false;
       }
 
       case 'PING': {
-        sendResponse({ alive: true, isRecording });
+        sendResponse({ alive: true, isRecording: isRecording });
         return true;
       }
 
@@ -535,5 +471,5 @@
     }
   });
 
-  console.log('[MeetRec offscreen] Ready');
+  console.log('[offscreen] ✅ Ready');
 })();

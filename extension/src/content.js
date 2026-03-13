@@ -1,215 +1,213 @@
 /*
  * content.js — MeetRec Content Script
  *
- * Injected into Google Meet tabs.
- * Detects which microphone Google Meet is using and
- * sends that device ID to the offscreen document.
+ * Captures microphone on the Meet page (where permission works),
+ * extracts raw PCM audio samples, and sends them to background.js
+ * which forwards them to the offscreen document for merging.
  */
 
 (function () {
   'use strict';
 
-  let isActive = false;
-  let mutationObserver = null;
+  if (window.__meetRecInjected) return;
+  window.__meetRecInjected = true;
 
-  /* ─────────── Detect which mic Google Meet is using ─────────── */
+  let micStream = null;
+  let micAudioContext = null;
+  let scriptProcessor = null;
+  let isCapturing = false;
+  let detectedMicDeviceId = null;
+  let detectedMicLabel = null;
+  let port = null;
 
-  async function detectMeetMicDevice() {
-    try {
-      /*
-       * METHOD 1: Check Google Meet's settings stored in localStorage
-       * Meet stores selected devices in its own storage
-       */
-
-      // METHOD 2: Look at active MediaStream tracks on the page
-      // Google Meet creates getUserMedia streams — we can find them
-      // by intercepting or checking RTCPeerConnection
-
-      // METHOD 3: Find the mic selector in Meet's UI and read its value
-      // Look for the settings panel audio input dropdown
-
-      // Most reliable: get all audio input devices and find which
-      // one has the same label as what Meet shows in its UI
-
-      const settingsButton = document.querySelector(
-        '[data-tooltip="Settings"], [aria-label="Settings"]'
-      );
-
-      // Try to read from Meet's DOM - the audio input indicator
-      const audioIndicators = document.querySelectorAll(
-        '[data-device-id], [data-audio-device]'
-      );
-
-      let meetDeviceId = null;
-
-      audioIndicators.forEach(el => {
-        const id = el.getAttribute('data-device-id') ||
-                   el.getAttribute('data-audio-device');
-        if (id) {
-          meetDeviceId = id;
-          console.log('[MeetRec content] Found Meet device ID in DOM:', id);
-        }
-      });
-
-      // Fallback: enumerate devices and send all info to offscreen
-      // so it can try to match
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const mics = devices.filter(d => d.kind === 'audioinput');
-
-      console.log('[MeetRec content] Available microphones on Meet page:');
-      mics.forEach((m, i) => {
-        console.log(`  [${i}] "${m.label}" id=${m.deviceId.substring(0, 12)}...`);
-      });
-
-      // If Meet is actively using a mic, we can detect it by checking
-      // which device currently has an active track
-      // Unfortunately we can't access Meet's MediaStreams directly
-
-      // Best approach: intercept getUserMedia to capture the device ID
-      // that Meet requested. We set this up at page load.
-
-      if (meetDeviceId) {
-        return meetDeviceId;
-      }
-
-      // If we intercepted the device ID earlier (see below), use that
-      if (window.__meetRecDetectedMicId) {
-        console.log('[MeetRec content] Using intercepted mic ID:',
-          window.__meetRecDetectedMicId);
-        return window.__meetRecDetectedMicId;
-      }
-
-      return null;
-
-    } catch (err) {
-      console.warn('[MeetRec content] Mic detection error:', err);
-      return null;
-    }
-  }
-
-  /* ─────────── Intercept getUserMedia to detect Meet's mic ─────────── */
+  /* ────────── Intercept getUserMedia to find Meet's mic ────────── */
 
   function interceptGetUserMedia() {
-    if (window.__meetRecIntercepted) return;
-    window.__meetRecIntercepted = true;
+    if (window.__meetRecGumIntercepted) return;
+    window.__meetRecGumIntercepted = true;
 
-    const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(
+    const original = navigator.mediaDevices.getUserMedia.bind(
       navigator.mediaDevices
     );
 
     navigator.mediaDevices.getUserMedia = async function (constraints) {
-      console.log('[MeetRec content] getUserMedia called with:', constraints);
+      const stream = await original(constraints);
 
-      const stream = await originalGetUserMedia(constraints);
-
-      // Check if this is an audio capture (Meet getting mic)
       if (constraints && constraints.audio) {
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          const track = audioTracks[0];
-          const settings = track.getSettings();
-
-          console.log('[MeetRec content] Meet audio track detected:');
-          console.log('  Label:', track.label);
-          console.log('  Device ID:', settings.deviceId);
-
-          // Store the device ID so we can use it later
-          window.__meetRecDetectedMicId = settings.deviceId;
-          window.__meetRecDetectedMicLabel = track.label;
-
-          // If we're already recording, send update to offscreen
-          if (isActive) {
-            chrome.runtime.sendMessage({
-              type: 'CONTENT_MIC_DETECTED',
-              deviceId: settings.deviceId,
-              label: track.label,
-            });
-          }
+        const tracks = stream.getAudioTracks();
+        if (tracks.length > 0) {
+          const settings = tracks[0].getSettings();
+          detectedMicDeviceId = settings.deviceId || null;
+          detectedMicLabel = tracks[0].label || null;
+          console.log('[MeetRec] Meet mic:', detectedMicLabel, '→', detectedMicDeviceId);
         }
       }
 
       return stream;
     };
 
-    console.log('[MeetRec content] getUserMedia interceptor installed');
+    console.log('[MeetRec] getUserMedia interceptor installed');
   }
 
-  /* ─────────── DOM Observer ─────────── */
+  /* ────────── Start mic capture and PCM streaming ────────── */
 
-  function startObservingDOM() {
-    if (mutationObserver) return;
+  async function startMicCapture() {
+    if (isCapturing) {
+      console.log('[MeetRec] Already capturing mic');
+      return { success: true };
+    }
 
-    mutationObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          if (node.tagName === 'AUDIO' || node.tagName === 'VIDEO') {
-            console.log('[MeetRec content] New media element:', node.tagName);
-          }
-          const children = node.querySelectorAll
-            ? node.querySelectorAll('audio, video')
-            : [];
-          if (children.length > 0) {
-            console.log('[MeetRec content] New media in subtree:', children.length);
-          }
-        }
+    try {
+      console.log('[MeetRec] Starting mic capture...');
+
+      // Build constraints
+      const audioConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        sampleRate: 44100,
+        channelCount: 1,
+      };
+
+      if (detectedMicDeviceId) {
+        audioConstraints.deviceId = { exact: detectedMicDeviceId };
+        console.log('[MeetRec] Using Meet mic device:', detectedMicDeviceId);
       }
-    });
 
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
+      // Capture mic
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: false,
+      });
 
-  function stopObservingDOM() {
-    if (mutationObserver) {
-      mutationObserver.disconnect();
-      mutationObserver = null;
+      const track = micStream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      console.log('[MeetRec] ✅ Mic captured:', track.label);
+      console.log('[MeetRec]   Sample rate:', settings.sampleRate);
+      console.log('[MeetRec]   Channels:', settings.channelCount);
+
+      // Create AudioContext to process mic audio
+      const sampleRate = settings.sampleRate || 44100;
+      micAudioContext = new AudioContext({ sampleRate: sampleRate });
+
+      const source = micAudioContext.createMediaStreamSource(micStream);
+
+      // Use ScriptProcessorNode to extract raw PCM samples
+      // Buffer size 4096 gives ~93ms chunks at 44100Hz
+      const bufferSize = 4096;
+      scriptProcessor = micAudioContext.createScriptProcessor(bufferSize, 1, 1);
+
+      let chunkCount = 0;
+
+      scriptProcessor.onaudioprocess = function (event) {
+        if (!isCapturing) return;
+
+        const inputData = event.inputBuffer.getChannelData(0);
+
+        // Convert Float32Array to regular array for message passing
+        // We need to copy the data because the buffer gets reused
+        const pcmData = new Float32Array(inputData.length);
+        pcmData.set(inputData);
+
+        // Send PCM data to background script
+        try {
+          chrome.runtime.sendMessage({
+            type: 'MIC_PCM_DATA',
+            pcm: Array.from(pcmData),
+            sampleRate: sampleRate,
+          });
+
+          chunkCount++;
+          if (chunkCount % 50 === 0) {
+            console.log('[MeetRec] Sent', chunkCount, 'mic chunks');
+          }
+        } catch (err) {
+          // Extension might have been reloaded
+          console.warn('[MeetRec] Failed to send PCM:', err.message);
+          stopMicCapture();
+        }
+
+        // Pass through silence (we don't want to play the mic back)
+        const outputData = event.outputBuffer.getChannelData(0);
+        for (let i = 0; i < outputData.length; i++) {
+          outputData[i] = 0;
+        }
+      };
+
+      // Connect: source → scriptProcessor → destination (required for processing)
+      source.connect(scriptProcessor);
+      scriptProcessor.connect(micAudioContext.destination);
+
+      isCapturing = true;
+      console.log('[MeetRec] ✅ Mic PCM streaming started (buffer:', bufferSize, 'rate:', sampleRate, ')');
+
+      return {
+        success: true,
+        label: track.label,
+        sampleRate: sampleRate,
+        deviceId: settings.deviceId,
+      };
+
+    } catch (err) {
+      console.error('[MeetRec] ❌ Mic capture failed:', err);
+      stopMicCapture();
+      return { success: false, error: err.message };
     }
   }
 
-  /* ─────────── Message listener ─────────── */
+  /* ────────── Stop mic capture ────────── */
+
+  function stopMicCapture() {
+    isCapturing = false;
+
+    if (scriptProcessor) {
+      scriptProcessor.disconnect();
+      scriptProcessor.onaudioprocess = null;
+      scriptProcessor = null;
+    }
+
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+
+    if (micAudioContext && micAudioContext.state !== 'closed') {
+      micAudioContext.close().catch(() => {});
+      micAudioContext = null;
+    }
+
+    console.log('[MeetRec] Mic capture stopped');
+  }
+
+  /* ────────── Message listener ────────── */
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || !message.type) return false;
 
     switch (message.type) {
 
-      case 'CAPTURE_MICROPHONE': {
-        (async () => {
-          try {
-            isActive = true;
-
-            // Detect which mic Meet is using
-            const meetMicId = await detectMeetMicDevice();
-
-            // Send the device ID to background → offscreen
-            chrome.runtime.sendMessage({
-              type: 'CONTENT_MIC_DETECTED',
-              deviceId: meetMicId,
-              label: window.__meetRecDetectedMicLabel || null,
-            });
-
-            startObservingDOM();
-            sendResponse({ success: true, micDeviceId: meetMicId });
-
-          } catch (err) {
-            sendResponse({ success: false, error: err.message });
-          }
-        })();
+      case 'START_MIC_CAPTURE': {
+        startMicCapture().then(sendResponse);
         return true;
       }
 
       case 'STOP_MICROPHONE': {
-        isActive = false;
-        stopObservingDOM();
+        stopMicCapture();
         sendResponse({ success: true });
         return true;
       }
 
+      case 'GET_MIC_INFO': {
+        sendResponse({
+          deviceId: detectedMicDeviceId,
+          label: detectedMicLabel,
+          isCapturing: isCapturing,
+        });
+        return true;
+      }
+
       case 'PING': {
-        sendResponse({ alive: true });
+        sendResponse({ alive: true, isCapturing: isCapturing });
         return true;
       }
 
@@ -218,20 +216,16 @@
     }
   });
 
-  /* ─────────── Initialize ─────────── */
+  /* ────────── Init ────────── */
 
-  console.log('[MeetRec content] Loaded on', window.location.href);
-
-  // Install the getUserMedia interceptor IMMEDIATELY
-  // so we catch Meet's mic selection from the start
+  console.log('[MeetRec] Content script loaded');
   interceptGetUserMedia();
 
-  // Check if we were recording before a page refresh
+  // Re-start capture if we were recording before page refresh
   chrome.storage.local.get(['isRecording'], (state) => {
     if (state.isRecording) {
-      console.log('[MeetRec content] Was recording, re-activating');
-      isActive = true;
-      startObservingDOM();
+      console.log('[MeetRec] Was recording, restarting mic capture');
+      startMicCapture();
     }
   });
 

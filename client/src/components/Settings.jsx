@@ -11,728 +11,566 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [activeSection, setActiveSection] = useState('github');
 
-  // GitHub settings
   const [githubToken, setGithubToken] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [githubValidated, setGithubValidated] = useState(false);
   const [githubOwner, setGithubOwner] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
-
-  // Preferences
   const [autoCreateIssues, setAutoCreateIssues] = useState(false);
   const [notifyOnCreation, setNotifyOnCreation] = useState(true);
-
-  // Contacts
   const [contacts, setContacts] = useState([]);
   const [newContactName, setNewContactName] = useState('');
   const [newContactEmail, setNewContactEmail] = useState('');
-
-  // Trello settings
   const [trelloApiKey, setTrelloApiKey] = useState('');
   const [trelloApiToken, setTrelloApiToken] = useState('');
   const [trelloListId, setTrelloListId] = useState('');
-
-  // Notion settings
   const [notionApiKey, setNotionApiKey] = useState('');
   const [notionDatabaseId, setNotionDatabaseId] = useState('');
-
-  // Google Calendar
   const [calendarToken, setCalendarToken] = useState('');
   const [calendarId, setCalendarId] = useState('primary');
 
+  useEffect(() => { fetchSettings(); }, []);
+
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (success) { const t = setTimeout(() => setSuccess(''), 4000); return () => clearTimeout(t); }
+  }, [success]);
+
+  useEffect(() => {
+    if (error) { const t = setTimeout(() => setError(''), 6000); return () => clearTimeout(t); }
+  }, [error]);
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/settings', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const response = await axios.get('http://localhost:5000/api/settings', { headers: { Authorization: `Bearer ${token}` } });
       const settings = response.data.settings;
       if (settings.github.repositoryUrl) {
         setGithubUrl(settings.github.repositoryUrl);
         setGithubValidated(settings.github.validated);
         setGithubOwner(settings.github.owner);
         setGithubRepo(settings.github.repo);
-        // Don't show actual token, but indicate it's set
-        if (settings.github.token === '••••••••') {
-          setGithubToken('••••••••');
-        }
+        if (settings.github.token === '••••••••') setGithubToken('••••••••');
       }
-
       setAutoCreateIssues(settings.preferences.autoCreateGitHubIssues);
       setNotifyOnCreation(settings.preferences.notifyOnIssueCreation);
       setContacts(settings.contacts || []);
-
       if (settings.googleCalendar) {
         setCalendarId(settings.googleCalendar.calendarId || 'primary');
-        if (settings.googleCalendar.accessToken === '••••••••') {
-          setCalendarToken('••••••••');
-        }
+        if (settings.googleCalendar.accessToken === '••••••••') setCalendarToken('••••••••');
       }
-
       if (settings.trello) {
         setTrelloListId(settings.trello.listId || '');
         if (settings.trello.apiKey === '••••••••') setTrelloApiKey('••••••••');
         if (settings.trello.apiToken === '••••••••') setTrelloApiToken('••••••••');
       }
-
       if (settings.notion) {
         setNotionDatabaseId(settings.notion.databaseId || '');
         if (settings.notion.apiKey === '••••••••') setNotionApiKey('••••••••');
       }
-
-      setError('');
-    } catch (err) {
-      setError('Failed to load settings');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Failed to load settings'); } finally { setLoading(false); }
   };
 
   const handleSaveGitHub = async () => {
+    if (!githubToken || !githubUrl) { setError('Please provide both GitHub token and repository URL'); return; }
     try {
-      if (!githubToken || !githubUrl) {
-        setError('Please provide both GitHub token and repository URL');
-        return;
-      }
-
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put(
-        'http://localhost:5000/api/settings/github',
-        {
-          token: githubToken,
-          repositoryUrl: githubUrl,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      const response = await axios.put('http://localhost:5000/api/settings/github', { token: githubToken, repositoryUrl: githubUrl }, { headers: { Authorization: `Bearer ${token}` } });
       setGithubValidated(response.data.github.validated);
       setGithubOwner(response.data.github.owner);
       setGithubRepo(response.data.github.repo);
-      setGithubToken('••••••••'); // Mask the token after saving
+      setGithubToken('••••••••');
       setSuccess(response.data.message);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save GitHub settings');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save GitHub settings'); } finally { setSaving(false); }
   };
 
   const handleSavePreferences = async () => {
     try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put(
-        'http://localhost:5000/api/settings/preferences',
-        {
-          autoCreateGitHubIssues: autoCreateIssues,
-          notifyOnIssueCreation: notifyOnCreation,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      await axios.put('http://localhost:5000/api/settings/preferences', { autoCreateGitHubIssues: autoCreateIssues, notifyOnIssueCreation: notifyOnCreation }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Preferences saved successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save preferences');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save preferences'); } finally { setSaving(false); }
   };
 
   const handleSaveTrello = async () => {
     try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put(
-        'http://localhost:5000/api/settings/trello',
-        {
-          apiKey: trelloApiKey === '••••••••' ? undefined : trelloApiKey,
-          apiToken: trelloApiToken === '••••••••' ? undefined : trelloApiToken,
-          listId: trelloListId,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      await axios.put('http://localhost:5000/api/settings/trello', { apiKey: trelloApiKey === '••••••••' ? undefined : trelloApiKey, apiToken: trelloApiToken === '••••••••' ? undefined : trelloApiToken, listId: trelloListId }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Trello settings saved successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save Trello settings');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save Trello settings'); } finally { setSaving(false); }
   };
 
   const handleSaveNotion = async () => {
     try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put(
-        'http://localhost:5000/api/settings/notion',
-        {
-          apiKey: notionApiKey === '••••••••' ? undefined : notionApiKey,
-          databaseId: notionDatabaseId,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      await axios.put('http://localhost:5000/api/settings/notion', { apiKey: notionApiKey === '••••••••' ? undefined : notionApiKey, databaseId: notionDatabaseId }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Notion settings saved successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save Notion settings');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save Notion settings'); } finally { setSaving(false); }
   };
 
   const handleClearGitHub = async () => {
-    if (!confirm('Are you sure you want to clear GitHub settings?')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to clear GitHub settings?')) return;
     try {
-      setSaving(true);
-      setError('');
+      setSaving(true); setError('');
       const token = localStorage.getItem('token');
-
-      await axios.delete('http://localhost:5000/api/settings/github', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setGithubToken('');
-      setGithubUrl('');
-      setGithubValidated(false);
-      setGithubOwner('');
-      setGithubRepo('');
+      await axios.delete('http://localhost:5000/api/settings/github', { headers: { Authorization: `Bearer ${token}` } });
+      setGithubToken(''); setGithubUrl(''); setGithubValidated(false); setGithubOwner(''); setGithubRepo('');
       setSuccess('GitHub settings cleared');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to clear GitHub settings');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to clear GitHub settings'); } finally { setSaving(false); }
   };
 
   const handleAddContact = () => {
-    if (!newContactName.trim() || !newContactEmail.trim()) {
-      setError('Please provide both name and email');
-      return;
-    }
+    if (!newContactName.trim() || !newContactEmail.trim()) { setError('Please provide both name and email'); return; }
     setContacts(prev => [...prev, { name: newContactName.trim(), emailAddress: newContactEmail.trim() }]);
-    setNewContactName('');
-    setNewContactEmail('');
+    setNewContactName(''); setNewContactEmail('');
   };
 
-  const handleRemoveContact = (indexToRemove) => {
-    setContacts(prev => prev.filter((_, index) => index !== indexToRemove));
-  };
+  const handleRemoveContact = (i) => setContacts(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSaveContacts = async () => {
     try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put(
-        'http://localhost:5000/api/settings/contacts',
-        { contacts },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
+      await axios.put('http://localhost:5000/api/settings/contacts', { contacts }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Contacts saved successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save contacts');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save contacts'); } finally { setSaving(false); }
   };
 
   const handleSaveCalendar = async () => {
     try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
+      setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put(
-        'http://localhost:5000/api/settings/google-calendar',
-        { accessToken: calendarToken, calendarId: calendarId || 'primary' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (response.data.googleCalendar.accessToken === '••••••••') {
-        setCalendarToken('••••••••');
-      }
+      const response = await axios.put('http://localhost:5000/api/settings/google-calendar', { accessToken: calendarToken, calendarId: calendarId || 'primary' }, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.data.googleCalendar.accessToken === '••••••••') setCalendarToken('••••••••');
       setSuccess('Google Calendar settings saved successfully');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save Google Calendar settings');
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.response?.data?.error || 'Failed to save Google Calendar settings'); } finally { setSaving(false); }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const sections = [
+    {
+      id: 'github', label: 'GitHub',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>,
+      status: githubValidated ? 'connected' : null,
+    },
+    {
+      id: 'calendar', label: 'Calendar',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+      status: calendarToken && calendarToken !== '' ? 'configured' : null,
+    },
+    {
+      id: 'trello', label: 'Trello',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M21 0H3C1.34 0 0 1.34 0 3v18c0 1.66 1.34 3 3 3h18c1.66 0 3-1.34 3-3V3c0-1.66-1.34-3-3-3zM10.44 18.18c0 .9-.73 1.63-1.63 1.63H5.55c-.9 0-1.63-.73-1.63-1.63V5.82c0-.9.73-1.63 1.63-1.63h3.26c.9 0 1.63.73 1.63 1.63v12.36zm9.63-5.45c0 .9-.73 1.63-1.63 1.63h-3.26c-.9 0-1.63-.73-1.63-1.63V5.82c0-.9.73-1.63 1.63-1.63h3.26c.9 0 1.63.73 1.63 1.63v6.91z"/></svg>,
+      status: trelloApiKey && trelloApiKey !== '' ? 'configured' : null,
+    },
+    {
+      id: 'notion', label: 'Notion',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L18.03 2.15c-.42-.326-.98-.7-2.055-.607L3.01 2.71c-.467.046-.56.28-.374.466l1.823 1.033zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.84-.046.933-.56.933-1.167V6.354c0-.606-.233-.933-.747-.886l-15.177.887c-.56.046-.746.326-.746.933zm14.337.745c.093.42 0 .84-.42.886l-.7.14v10.264c-.607.327-1.167.514-1.634.514-.746 0-.933-.234-1.493-.933l-4.573-7.186v6.953l1.447.327s0 .84-1.167.84l-3.22.187c-.093-.187 0-.653.327-.746l.84-.233V9.854L7.46 9.76c-.093-.42.14-1.026.793-1.073l3.453-.233 4.76 7.28v-6.44l-1.214-.14c-.093-.513.28-.886.747-.933l3.22-.187z"/></svg>,
+      status: notionApiKey && notionApiKey !== '' ? 'configured' : null,
+    },
+    {
+      id: 'contacts', label: 'Contacts',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+      status: contacts.length > 0 ? `${contacts.length}` : null,
+    },
+    {
+      id: 'preferences', label: 'Preferences',
+      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+      status: null,
+    },
+  ];
+
+  const InputField = ({ label, hint, linkText, linkHref, children }) => (
+    <div>
+      <label className="block text-[13px] font-semibold text-[#3D5249] mb-2">{label}</label>
+      {children}
+      {(hint || linkHref) && (
+        <p className="text-[#8FA89F] text-[11px] mt-1.5">
+          {hint}
+          {linkHref && <a href={linkHref} target="_blank" rel="noopener noreferrer" className="text-[#B45309] hover:underline ml-1">{linkText}</a>}
+        </p>
+      )}
+    </div>
+  );
+
+  const inputClass = "w-full px-4 py-3 bg-[#F7FAF8] border border-[#D4E0DA] rounded-xl text-[#0C1A15] text-sm font-medium focus:ring-2 focus:ring-[#D97706]/20 focus:border-[#D97706]/40 transition-all outline-none disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[#8FA89F]";
+
+  const SaveButton = ({ onClick, disabled, children }) => (
+    <button onClick={onClick} disabled={disabled || saving}
+      className="bg-gradient-to-r from-[#B45309] to-[#F59E0B] hover:shadow-lg hover:shadow-[#B45309]/20 disabled:opacity-40 disabled:hover:shadow-none text-white font-semibold px-6 py-2.5 rounded-xl transition-all text-sm">
+      {saving ? (
+        <span className="flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+          Saving...
+        </span>
+      ) : children}
+    </button>
+  );
+
+  const DangerButton = ({ onClick, disabled, children }) => (
+    <button onClick={onClick} disabled={disabled || saving}
+      className="text-[#B91C1C] hover:text-white hover:bg-[#B91C1C] border border-[#B91C1C]/20 hover:border-[#B91C1C] font-medium px-5 py-2.5 rounded-xl transition-all text-sm disabled:opacity-40">
+      {children}
+    </button>
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-gray-500">Loading settings...</p>
+      <div className="min-h-screen bg-[#F0F4F2] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="w-8 h-8 animate-spin text-[#D97706]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+          <p className="text-[#7A9489] text-sm font-medium">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-linear-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <p className="text-indigo-100 mt-1">{user?.name}</p>
+    <div className="min-h-screen bg-[#F0F4F2]" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {/* Header */}
+      <header className="bg-[#0C1A15] sticky top-0 z-30 border-b border-white/5">
+        <div className="max-w-[1200px] mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#B45309] to-[#F59E0B] flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-white text-lg font-semibold tracking-tight">Settings</h1>
+              <p className="text-[#8FA89F] text-xs mt-0.5">{user?.name}</p>
+            </div>
           </div>
-          <div className="space-x-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg transition"
-            >
-              Back to Dashboard
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/dashboard')} className="text-[#8FA89F] hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all flex items-center gap-1.5">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              Dashboard
             </button>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-lg transition"
-            >
+            <button onClick={handleLogout} className="text-[#B91C1C]/70 hover:text-[#B91C1C] text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#B91C1C]/5 transition-all">
               Logout
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Error Message */}
+      <main className="max-w-[1200px] mx-auto px-6 py-8">
+        {/* Notifications */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
-            {error}
+          <div className="mb-6 flex items-start gap-3 bg-[#B91C1C]/5 border border-[#B91C1C]/15 rounded-xl px-5 py-4 animate-in">
+            <div className="w-5 h-5 rounded-full bg-[#B91C1C]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-[#B91C1C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </div>
+            <p className="text-[#B91C1C] text-sm font-medium flex-1">{error}</p>
+            <button onClick={() => setError('')} className="text-[#B91C1C]/40 hover:text-[#B91C1C]"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
         )}
-
-        {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
-            {success}
+          <div className="mb-6 flex items-start gap-3 bg-[#15803D]/5 border border-[#15803D]/15 rounded-xl px-5 py-4 animate-in">
+            <div className="w-5 h-5 rounded-full bg-[#15803D]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-[#15803D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <p className="text-[#15803D] text-sm font-medium flex-1">{success}</p>
           </div>
         )}
 
-        {/* GitHub Integration Settings */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">GitHub Integration</h2>
-              <p className="text-gray-600 mt-1">Configure GitHub for automatic issue creation</p>
-            </div>
-            <div className="text-3xl">
-              <span>🐙</span>
-            </div>
-          </div>
-
-          {githubValidated && (
-            <div className="bg-green-50 border border-green-200 rounded p-4 mb-6">
-              <p className="text-green-800 font-semibold">✓ Connected</p>
-              <p className="text-green-700 text-sm mt-1">
-                {githubOwner}/{githubRepo}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                GitHub Personal Access Token *
-              </label>
-              <input
-                type="password"
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
-                disabled={githubToken === '••••••••'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-              <p className="text-gray-600 text-xs mt-2">
-                Create a token at:
-                <a
-                  href="https://github.com/settings/tokens"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 hover:underline ml-1"
-                >
-                  github.com/settings/tokens
-                </a>
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                GitHub Repository URL *
-              </label>
-              <input
-                type="text"
-                placeholder="https://github.com/owner/repo"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-              <p className="text-gray-600 text-xs mt-2">
-                Example: https://github.com/yourname/your-repo
-              </p>
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={handleSaveGitHub}
-                disabled={saving || !githubToken || !githubUrl}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save & Validate'}
-              </button>
-
-              {githubValidated && (
-                <button
-                  onClick={handleClearGitHub}
-                  disabled={saving}
-                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-                >
-                  {saving ? 'Clearing...' : 'Clear Settings'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Google Calendar Settings */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Google Calendar</h2>
-              <p className="text-gray-600 mt-1">Configure credentials to schedule extracted events.</p>
-            </div>
-            <div className="text-3xl">
-              <span>📅</span>
+        <div className="flex gap-6">
+          {/* Sidebar Navigation */}
+          <div className="w-56 flex-shrink-0">
+            <div className="sticky top-24">
+              <nav className="space-y-1">
+                {sections.map(section => (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
+                      activeSection === section.id
+                        ? 'bg-white border border-[#D4E0DA] text-[#0C1A15] shadow-sm'
+                        : 'text-[#7A9489] hover:text-[#3D5249] hover:bg-white/50'
+                    }`}
+                    style={activeSection === section.id ? { borderLeft: '2px solid #D97706' } : {}}
+                  >
+                    <span className={activeSection === section.id ? 'text-[#D97706]' : ''}>{section.icon}</span>
+                    <span className="flex-1">{section.label}</span>
+                    {section.status && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        section.status === 'connected' ? 'bg-[#15803D]/10 text-[#15803D]' :
+                        section.status === 'configured' ? 'bg-[#D97706]/10 text-[#D97706]' :
+                        'bg-[#F7FAF8] text-[#8FA89F]'
+                      }`}>
+                        {section.status === 'connected' ? '✓' : section.status === 'configured' ? '✓' : section.status}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Google OAuth / Service Account Access Token
-              </label>
-              <input
-                type="password"
-                placeholder="ya29.a0A..."
-                value={calendarToken}
-                onChange={(e) => setCalendarToken(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-              <p className="text-gray-600 text-xs mt-2">
-                Your temporary Google OAuth Token or generic proxy token.
-              </p>
-            </div>
+          {/* Content Area */}
+          <div className="flex-1 min-w-0">
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Calendar ID
-              </label>
-              <input
-                type="text"
-                placeholder="primary"
-                value={calendarId}
-                onChange={(e) => setCalendarId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-              <p className="text-gray-600 text-xs mt-2">
-                Usually 'primary' for your default calendar, or a specific Calendar ID.
-              </p>
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={handleSaveCalendar}
-                disabled={saving || !calendarToken}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save Calendar Settings'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Trello Integration Settings */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Trello Integration</h2>
-              <p className="text-gray-600 mt-1">Configure Trello for automatic card creation</p>
-            </div>
-            <div className="text-3xl">
-              <span>📋</span>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trello API Key *
-              </label>
-              <input
-                type="text"
-                placeholder="Enter Trello API Key"
-                value={trelloApiKey}
-                onChange={(e) => setTrelloApiKey(e.target.value)}
-                disabled={trelloApiKey === '••••••••'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trello API Token *
-              </label>
-              <input
-                type="password"
-                placeholder="Enter Trello API Token"
-                value={trelloApiToken}
-                onChange={(e) => setTrelloApiToken(e.target.value)}
-                disabled={trelloApiToken === '••••••••'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trello List ID *
-              </label>
-              <input
-                type="text"
-                placeholder="Enter the ID of the Trello List to add cards to"
-                value={trelloListId}
-                onChange={(e) => setTrelloListId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={handleSaveTrello}
-                disabled={saving || !trelloApiKey || !trelloApiToken || !trelloListId}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save Trello Settings'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Notion Integration Settings */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Notion Integration</h2>
-              <p className="text-gray-600 mt-1">Configure Notion to auto-generate meeting summaries</p>
-            </div>
-            <div className="text-3xl">
-              <span>📓</span>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notion Internal Integration Token (API Key) *
-              </label>
-              <input
-                type="password"
-                placeholder="secret_xxxxxxxxxxxx"
-                value={notionApiKey}
-                onChange={(e) => setNotionApiKey(e.target.value)}
-                disabled={notionApiKey === '••••••••'}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notion Database ID *
-              </label>
-              <input
-                type="text"
-                placeholder="Enter Database ID"
-                value={notionDatabaseId}
-                onChange={(e) => setNotionDatabaseId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={handleSaveNotion}
-                disabled={saving || !notionApiKey || !notionDatabaseId}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save Notion Settings'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Contacts (Email Routing) */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Email Contacts</h2>
-              <p className="text-gray-600 mt-1">Configure email routing by mapping names from transcripts</p>
-            </div>
-            <div className="text-3xl">
-              <span>📧</span>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {contacts.map((contact, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
-                <div>
-                  <p className="font-semibold text-gray-800">{contact.name}</p>
-                  <p className="text-sm text-gray-600">{contact.emailAddress}</p>
+            {/* GitHub */}
+            {activeSection === 'github' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#0C1A15] flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">GitHub Integration</h2>
+                      <p className="text-[#7A9489] text-sm">Connect your repository for issues and pull requests</p>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleRemoveContact(idx)}
-                  className="text-red-500 hover:text-red-700 font-semibold text-sm"
-                >
-                  Remove
-                </button>
+
+                <div className="px-8 pb-8 pt-4 space-y-5">
+                  {githubValidated && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-[#15803D]/5 border border-[#15803D]/15 rounded-xl">
+                      <div className="w-2 h-2 rounded-full bg-[#15803D]"/>
+                      <div>
+                        <p className="text-[#15803D] text-sm font-semibold">Connected</p>
+                        <p className="text-[#15803D]/70 text-xs font-mono">{githubOwner}/{githubRepo}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <InputField label="Personal Access Token" hint="Create a token at" linkText="github.com/settings/tokens" linkHref="https://github.com/settings/tokens">
+                    <input type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" value={githubToken} onChange={(e) => setGithubToken(e.target.value)} disabled={githubToken === '••••••••'} className={inputClass}/>
+                    {githubToken === '••••••••' && (
+                      <button onClick={() => setGithubToken('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change token</button>
+                    )}
+                  </InputField>
+
+                  <InputField label="Repository URL" hint="Example: https://github.com/yourname/your-repo">
+                    <input type="text" placeholder="https://github.com/owner/repo" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} className={inputClass}/>
+                  </InputField>
+
+                  <div className="flex gap-3 pt-2">
+                    <SaveButton onClick={handleSaveGitHub} disabled={!githubToken || !githubUrl}>Save & Validate</SaveButton>
+                    {githubValidated && <DangerButton onClick={handleClearGitHub}>Clear Settings</DangerButton>}
+                  </div>
+                </div>
               </div>
-            ))}
+            )}
 
-            <div className="flex gap-4 mt-4">
-              <input
-                type="text"
-                placeholder="Name (e.g., John)"
-                value={newContactName}
-                onChange={(e) => setNewContactName(e.target.value)}
-                className="w-1/3 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={newContactEmail}
-                onChange={(e) => setNewContactEmail(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                onClick={handleAddContact}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                Add
-              </button>
-            </div>
+            {/* Google Calendar */}
+            {activeSection === 'calendar' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#B45309]/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[#B45309]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">Google Calendar</h2>
+                      <p className="text-[#7A9489] text-sm">Schedule extracted events automatically</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 pb-8 pt-4 space-y-5">
+                  <InputField label="Access Token" hint="Your temporary Google OAuth token or service account token.">
+                    <input type="password" placeholder="ya29.a0A..." value={calendarToken} onChange={(e) => setCalendarToken(e.target.value)} className={inputClass}/>
+                    {calendarToken === '••••••••' && (
+                      <button onClick={() => setCalendarToken('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change token</button>
+                    )}
+                  </InputField>
+                  <InputField label="Calendar ID" hint="Usually 'primary' for your default calendar.">
+                    <input type="text" placeholder="primary" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} className={inputClass}/>
+                  </InputField>
+                  <div className="pt-2">
+                    <SaveButton onClick={handleSaveCalendar} disabled={!calendarToken}>Save Calendar Settings</SaveButton>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <div className="pt-4">
-              <button
-                onClick={handleSaveContacts}
-                disabled={saving}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save Contacts'}
-              </button>
-            </div>
+            {/* Trello */}
+            {activeSection === 'trello' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#3D5249]/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[#3D5249]" viewBox="0 0 24 24" fill="currentColor"><path d="M21 0H3C1.34 0 0 1.34 0 3v18c0 1.66 1.34 3 3 3h18c1.66 0 3-1.34 3-3V3c0-1.66-1.34-3-3-3zM10.44 18.18c0 .9-.73 1.63-1.63 1.63H5.55c-.9 0-1.63-.73-1.63-1.63V5.82c0-.9.73-1.63 1.63-1.63h3.26c.9 0 1.63.73 1.63 1.63v12.36zm9.63-5.45c0 .9-.73 1.63-1.63 1.63h-3.26c-.9 0-1.63-.73-1.63-1.63V5.82c0-.9.73-1.63 1.63-1.63h3.26c.9 0 1.63.73 1.63 1.63v6.91z"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">Trello Integration</h2>
+                      <p className="text-[#7A9489] text-sm">Create task cards from meeting action items</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 pb-8 pt-4 space-y-5">
+                  <InputField label="API Key">
+                    <input type="text" placeholder="Enter Trello API Key" value={trelloApiKey} onChange={(e) => setTrelloApiKey(e.target.value)} disabled={trelloApiKey === '••••••••'} className={inputClass}/>
+                    {trelloApiKey === '••••••••' && <button onClick={() => setTrelloApiKey('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change key</button>}
+                  </InputField>
+                  <InputField label="API Token">
+                    <input type="password" placeholder="Enter Trello API Token" value={trelloApiToken} onChange={(e) => setTrelloApiToken(e.target.value)} disabled={trelloApiToken === '••••••••'} className={inputClass}/>
+                    {trelloApiToken === '••••••••' && <button onClick={() => setTrelloApiToken('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change token</button>}
+                  </InputField>
+                  <InputField label="List ID" hint="The ID of the Trello list to add cards to.">
+                    <input type="text" placeholder="Enter Trello List ID" value={trelloListId} onChange={(e) => setTrelloListId(e.target.value)} className={inputClass}/>
+                  </InputField>
+                  <div className="pt-2">
+                    <SaveButton onClick={handleSaveTrello} disabled={!trelloApiKey || !trelloApiToken || !trelloListId}>Save Trello Settings</SaveButton>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notion */}
+            {activeSection === 'notion' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#0C1A15]/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[#0C1A15]" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L18.03 2.15c-.42-.326-.98-.7-2.055-.607L3.01 2.71c-.467.046-.56.28-.374.466l1.823 1.033zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.84-.046.933-.56.933-1.167V6.354c0-.606-.233-.933-.747-.886l-15.177.887c-.56.046-.746.326-.746.933zm14.337.745c.093.42 0 .84-.42.886l-.7.14v10.264c-.607.327-1.167.514-1.634.514-.746 0-.933-.234-1.493-.933l-4.573-7.186v6.953l1.447.327s0 .84-1.167.84l-3.22.187c-.093-.187 0-.653.327-.746l.84-.233V9.854L7.46 9.76c-.093-.42.14-1.026.793-1.073l3.453-.233 4.76 7.28v-6.44l-1.214-.14c-.093-.513.28-.886.747-.933l3.22-.187z"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">Notion Integration</h2>
+                      <p className="text-[#7A9489] text-sm">Generate formatted meeting summary pages</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 pb-8 pt-4 space-y-5">
+                  <InputField label="Integration Token" hint="Create an internal integration at notion.so/my-integrations">
+                    <input type="password" placeholder="secret_xxxxxxxxxxxx" value={notionApiKey} onChange={(e) => setNotionApiKey(e.target.value)} disabled={notionApiKey === '••••••••'} className={inputClass}/>
+                    {notionApiKey === '••••••••' && <button onClick={() => setNotionApiKey('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change token</button>}
+                  </InputField>
+                  <InputField label="Database ID" hint="The ID of the Notion database to create pages in.">
+                    <input type="text" placeholder="Enter Database ID" value={notionDatabaseId} onChange={(e) => setNotionDatabaseId(e.target.value)} className={inputClass}/>
+                  </InputField>
+                  <div className="pt-2">
+                    <SaveButton onClick={handleSaveNotion} disabled={!notionApiKey || !notionDatabaseId}>Save Notion Settings</SaveButton>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Contacts */}
+            {activeSection === 'contacts' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#15803D]/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[#15803D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">Email Contacts</h2>
+                      <p className="text-[#7A9489] text-sm">Map names from transcripts to email addresses</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 pb-8 pt-4 space-y-4">
+                  {/* Contact List */}
+                  {contacts.length > 0 ? (
+                    <div className="space-y-2">
+                      {contacts.map((contact, idx) => (
+                        <div key={idx} className="flex items-center justify-between px-4 py-3 bg-[#F7FAF8] border border-[#D4E0DA] rounded-xl group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#E8F0EC] flex items-center justify-center">
+                              <span className="text-[#3D5249] text-xs font-bold">{contact.name.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <p className="text-[#0C1A15] text-sm font-medium">{contact.name}</p>
+                              <p className="text-[#8FA89F] text-xs font-mono">{contact.emailAddress}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => handleRemoveContact(idx)} className="text-[#B91C1C]/0 group-hover:text-[#B91C1C]/60 hover:!text-[#B91C1C] transition-all text-xs font-medium">
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-[#F7FAF8] rounded-xl border border-[#D4E0DA]">
+                      <p className="text-[#8FA89F] text-sm">No contacts configured yet</p>
+                    </div>
+                  )}
+
+                  {/* Add Contact */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-1/3">
+                      <label className="block text-[11px] font-semibold text-[#7A9489] mb-1.5 uppercase tracking-wider">Name</label>
+                      <input type="text" placeholder="e.g. John" value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className={inputClass}/>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[11px] font-semibold text-[#7A9489] mb-1.5 uppercase tracking-wider">Email</label>
+                      <input type="email" placeholder="john@example.com" value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} className={inputClass}/>
+                    </div>
+                    <button onClick={handleAddContact}
+                      className="bg-[#15803D] hover:bg-[#166534] text-white font-semibold px-5 py-3 rounded-xl transition-all text-sm whitespace-nowrap">
+                      Add
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    <SaveButton onClick={handleSaveContacts}>Save Contacts</SaveButton>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Preferences */}
+            {activeSection === 'preferences' && (
+              <div className="bg-white rounded-2xl border border-[#D4E0DA] overflow-hidden">
+                <div className="px-8 pt-8 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-[#D97706]/10 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[#D97706]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-[#0C1A15] tracking-tight">Preferences</h2>
+                      <p className="text-[#7A9489] text-sm">Configure automation behavior</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 pb-8 pt-4 space-y-3">
+                  {/* Toggle: Auto-create */}
+                  <div className="flex items-center justify-between px-5 py-4 bg-[#F7FAF8] border border-[#D4E0DA] rounded-xl">
+                    <div>
+                      <p className="text-[#0C1A15] text-sm font-medium">Auto-Create GitHub Issues</p>
+                      <p className="text-[#8FA89F] text-xs mt-0.5">Automatically create issues from technical analysis</p>
+                    </div>
+                    <button
+                      onClick={() => setAutoCreateIssues(!autoCreateIssues)}
+                      disabled={!githubValidated}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoCreateIssues ? 'bg-[#D97706]' : 'bg-[#D4E0DA]'} ${!githubValidated ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${autoCreateIssues ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+
+                  {/* Toggle: Notify */}
+                  <div className="flex items-center justify-between px-5 py-4 bg-[#F7FAF8] border border-[#D4E0DA] rounded-xl">
+                    <div>
+                      <p className="text-[#0C1A15] text-sm font-medium">Notify on Issue Creation</p>
+                      <p className="text-[#8FA89F] text-xs mt-0.5">Receive notifications when issues are created</p>
+                    </div>
+                    <button
+                      onClick={() => setNotifyOnCreation(!notifyOnCreation)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${notifyOnCreation ? 'bg-[#D97706]' : 'bg-[#D4E0DA]'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${notifyOnCreation ? 'translate-x-6' : 'translate-x-1'}`}/>
+                    </button>
+                  </div>
+
+                  <div className="pt-2">
+                    <SaveButton onClick={handleSavePreferences}>Save Preferences</SaveButton>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Preferences */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Preferences</h2>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Auto-Create GitHub Issues
-                </label>
-                <p className="text-gray-600 text-xs mt-1">
-                  Automatically create GitHub issues from technical analysis
-                </p>
-              </div>
-              <button
-                onClick={() => setAutoCreateIssues(!autoCreateIssues)}
-                disabled={!githubValidated}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${autoCreateIssues ? 'bg-indigo-600' : 'bg-gray-200'
-                  } ${!githubValidated ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${autoCreateIssues ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Notify on Issue Creation
-                </label>
-                <p className="text-gray-600 text-xs mt-1">
-                  Receive notifications when GitHub issues are created
-                </p>
-              </div>
-              <button
-                onClick={() => setNotifyOnCreation(!notifyOnCreation)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${notifyOnCreation ? 'bg-indigo-600' : 'bg-gray-200'
-                  }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${notifyOnCreation ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                />
-              </button>
-            </div>
-
-            <div className="pt-4">
-              <button
-                onClick={handleSavePreferences}
-                disabled={saving}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition"
-              >
-                {saving ? 'Saving...' : 'Save Preferences'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 };

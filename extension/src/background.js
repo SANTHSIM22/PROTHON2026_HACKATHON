@@ -1,238 +1,372 @@
 /*
- * content.js — MeetRec Content Script
+ * background.js — MeetRec Service Worker
  *
- * Injected into Google Meet tabs.
- * Detects which microphone Google Meet is using and
- * sends that device ID to the offscreen document.
+ * Coordinates between content script (mic PCM) and offscreen (tab + recording).
+ * Forwards mic PCM chunks from content script to offscreen document.
  */
 
-(function () {
-  'use strict';
+const DEFAULT_STATE = {
+  isRecording: false,
+  meetTabId: null,
+  startTime: null,
+  recordingStatus: 'idle',
+  wasInterrupted: false,
+};
 
-  let isActive = false;
-  let mutationObserver = null;
-
-  /* ─────────── Detect which mic Google Meet is using ─────────── */
-
-  async function detectMeetMicDevice() {
-    try {
-      /*
-       * METHOD 1: Check Google Meet's settings stored in localStorage
-       * Meet stores selected devices in its own storage
-       */
-
-      // METHOD 2: Look at active MediaStream tracks on the page
-      // Google Meet creates getUserMedia streams — we can find them
-      // by intercepting or checking RTCPeerConnection
-
-      // METHOD 3: Find the mic selector in Meet's UI and read its value
-      // Look for the settings panel audio input dropdown
-
-      // Most reliable: get all audio input devices and find which
-      // one has the same label as what Meet shows in its UI
-
-      const settingsButton = document.querySelector(
-        '[data-tooltip="Settings"], [aria-label="Settings"]'
-      );
-
-      // Try to read from Meet's DOM - the audio input indicator
-      const audioIndicators = document.querySelectorAll(
-        '[data-device-id], [data-audio-device]'
-      );
-
-      let meetDeviceId = null;
-
-      audioIndicators.forEach(el => {
-        const id = el.getAttribute('data-device-id') ||
-                   el.getAttribute('data-audio-device');
-        if (id) {
-          meetDeviceId = id;
-          console.log('[MeetRec content] Found Meet device ID in DOM:', id);
-        }
-      });
-
-      // Fallback: enumerate devices and send all info to offscreen
-      // so it can try to match
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const mics = devices.filter(d => d.kind === 'audioinput');
-
-      console.log('[MeetRec content] Available microphones on Meet page:');
-      mics.forEach((m, i) => {
-        console.log(`  [${i}] "${m.label}" id=${m.deviceId.substring(0, 12)}...`);
-      });
-
-      // If Meet is actively using a mic, we can detect it by checking
-      // which device currently has an active track
-      // Unfortunately we can't access Meet's MediaStreams directly
-
-      // Best approach: intercept getUserMedia to capture the device ID
-      // that Meet requested. We set this up at page load.
-
-      if (meetDeviceId) {
-        return meetDeviceId;
-      }
-
-      // If we intercepted the device ID earlier (see below), use that
-      if (window.__meetRecDetectedMicId) {
-        console.log('[MeetRec content] Using intercepted mic ID:',
-          window.__meetRecDetectedMicId);
-        return window.__meetRecDetectedMicId;
-      }
-
-      return null;
-
-    } catch (err) {
-      console.warn('[MeetRec content] Mic detection error:', err);
-      return null;
-    }
-  }
-
-  /* ─────────── Intercept getUserMedia to detect Meet's mic ─────────── */
-
-  function interceptGetUserMedia() {
-    if (window.__meetRecIntercepted) return;
-    window.__meetRecIntercepted = true;
-
-    const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(
-      navigator.mediaDevices
+async function getState() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(
+      ['isRecording', 'meetTabId', 'startTime', 'recordingStatus', 'wasInterrupted'],
+      (result) => resolve({ ...DEFAULT_STATE, ...result })
     );
+  });
+}
 
-    navigator.mediaDevices.getUserMedia = async function (constraints) {
-      console.log('[MeetRec content] getUserMedia called with:', constraints);
+async function setState(patch) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(patch, resolve);
+  });
+}
 
-      const stream = await originalGetUserMedia(constraints);
+async function resetState() {
+  await setState({ ...DEFAULT_STATE });
+}
 
-      // Check if this is an audio capture (Meet getting mic)
-      if (constraints && constraints.audio) {
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          const track = audioTracks[0];
-          const settings = track.getSettings();
+/* ────────── Offscreen document ────────── */
 
-          console.log('[MeetRec content] Meet audio track detected:');
-          console.log('  Label:', track.label);
-          console.log('  Device ID:', settings.deviceId);
+let offscreenCreating = null;
 
-          // Store the device ID so we can use it later
-          window.__meetRecDetectedMicId = settings.deviceId;
-          window.__meetRecDetectedMicLabel = track.label;
-
-          // If we're already recording, send update to offscreen
-          if (isActive) {
-            chrome.runtime.sendMessage({
-              type: 'CONTENT_MIC_DETECTED',
-              deviceId: settings.deviceId,
-              label: track.label,
-            });
-          }
-        }
-      }
-
-      return stream;
-    };
-
-    console.log('[MeetRec content] getUserMedia interceptor installed');
-  }
-
-  /* ─────────── DOM Observer ─────────── */
-
-  function startObservingDOM() {
-    if (mutationObserver) return;
-
-    mutationObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          if (node.tagName === 'AUDIO' || node.tagName === 'VIDEO') {
-            console.log('[MeetRec content] New media element:', node.tagName);
-          }
-          const children = node.querySelectorAll
-            ? node.querySelectorAll('audio, video')
-            : [];
-          if (children.length > 0) {
-            console.log('[MeetRec content] New media in subtree:', children.length);
-          }
-        }
-      }
-    });
-
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  function stopObservingDOM() {
-    if (mutationObserver) {
-      mutationObserver.disconnect();
-      mutationObserver = null;
-    }
-  }
-
-  /* ─────────── Message listener ─────────── */
-
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || !message.type) return false;
-
-    switch (message.type) {
-
-      case 'CAPTURE_MICROPHONE': {
-        (async () => {
-          try {
-            isActive = true;
-
-            // Detect which mic Meet is using
-            const meetMicId = await detectMeetMicDevice();
-
-            // Send the device ID to background → offscreen
-            chrome.runtime.sendMessage({
-              type: 'CONTENT_MIC_DETECTED',
-              deviceId: meetMicId,
-              label: window.__meetRecDetectedMicLabel || null,
-            });
-
-            startObservingDOM();
-            sendResponse({ success: true, micDeviceId: meetMicId });
-
-          } catch (err) {
-            sendResponse({ success: false, error: err.message });
-          }
-        })();
-        return true;
-      }
-
-      case 'STOP_MICROPHONE': {
-        isActive = false;
-        stopObservingDOM();
-        sendResponse({ success: true });
-        return true;
-      }
-
-      case 'PING': {
-        sendResponse({ alive: true });
-        return true;
-      }
-
-      default:
-        return false;
-    }
+async function ensureOffscreenDocument() {
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen.html')],
   });
 
-  /* ─────────── Initialize ─────────── */
+  if (contexts.length > 0) return;
 
-  console.log('[MeetRec content] Loaded on', window.location.href);
+  if (offscreenCreating) {
+    await offscreenCreating;
+    return;
+  }
 
-  // Install the getUserMedia interceptor IMMEDIATELY
-  // so we catch Meet's mic selection from the start
-  interceptGetUserMedia();
+  offscreenCreating = chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['USER_MEDIA', 'AUDIO_PLAYBACK'],
+    justification: 'Recording Google Meet audio with MediaRecorder',
+  });
 
-  // Check if we were recording before a page refresh
-  chrome.storage.local.get(['isRecording'], (state) => {
+  await offscreenCreating;
+  offscreenCreating = null;
+}
+
+async function closeOffscreenDocument() {
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen.html')],
+  });
+
+  if (contexts.length > 0) {
+    await chrome.offscreen.closeDocument();
+  }
+}
+
+/* ────────── Tab capture ────────── */
+
+async function getTabMediaStreamId(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(streamId);
+      }
+    });
+  });
+}
+
+/* ────────── Find Meet tab ────────── */
+
+async function findMeetTab() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!tabs || tabs.length === 0) {
+        reject(new Error('No active tab found'));
+        return;
+      }
+      const tab = tabs[0];
+      if (tab.url && tab.url.startsWith('https://meet.google.com/')) {
+        resolve(tab);
+      } else {
+        reject(new Error('Active tab is not a Google Meet tab'));
+      }
+    });
+  });
+}
+
+/* ────────── Inject content script ────────── */
+
+async function ensureContentScript(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+    if (response && response.alive) {
+      console.log('[bg] Content script already running');
+      return true;
+    }
+  } catch (e) {
+    // Not loaded yet
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ['content.js'],
+    });
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+    if (response && response.alive) {
+      console.log('[bg] Content script injected and running');
+      return true;
+    }
+  } catch (err) {
+    console.error('[bg] Content script injection failed:', err.message);
+  }
+
+  return false;
+}
+
+/* ────────── Start recording ────────── */
+
+async function startRecording(sendResponse) {
+  try {
+    const state = await getState();
     if (state.isRecording) {
-      console.log('[MeetRec content] Was recording, re-activating');
-      isActive = true;
-      startObservingDOM();
+      sendResponse({ success: false, error: 'Already recording' });
+      return;
     }
-  });
 
-})();
+    // Step 1: Find Meet tab
+    let meetTab;
+    try {
+      meetTab = await findMeetTab();
+    } catch (err) {
+      sendResponse({ success: false, error: err.message });
+      return;
+    }
+
+    const tabId = meetTab.id;
+    console.log('[bg] Meet tab:', tabId);
+
+    // Step 2: Inject content script
+    const contentReady = await ensureContentScript(tabId);
+    if (!contentReady) {
+      console.warn('[bg] Content script not available');
+    }
+
+    // Step 3: Create offscreen document FIRST
+    await ensureOffscreenDocument();
+    await new Promise(r => setTimeout(r, 500));
+
+    // Step 4: Get tab capture stream ID
+    let tabStreamId;
+    try {
+      tabStreamId = await getTabMediaStreamId(tabId);
+      console.log('[bg] Tab stream ID obtained');
+    } catch (err) {
+      sendResponse({ success: false, error: 'Tab capture failed: ' + err.message });
+      return;
+    }
+
+    // Step 5: Tell offscreen to start recording tab audio
+    chrome.runtime.sendMessage({
+      type: 'OFFSCREEN_START_RECORDING',
+      tabStreamId: tabStreamId,
+    });
+
+    await new Promise(r => setTimeout(r, 500));
+
+    // Step 6: Tell content script to start capturing mic and streaming PCM
+    if (contentReady) {
+      try {
+        const micResult = await chrome.tabs.sendMessage(tabId, {
+          type: 'START_MIC_CAPTURE',
+        });
+        console.log('[bg] Mic capture result:', micResult);
+
+        if (micResult && micResult.success) {
+          // Tell offscreen what sample rate the mic is using
+          chrome.runtime.sendMessage({
+            type: 'OFFSCREEN_MIC_INFO',
+            sampleRate: micResult.sampleRate || 44100,
+            label: micResult.label,
+          });
+          console.log('[bg] ✅ Mic capture started, sample rate:', micResult.sampleRate);
+        } else {
+          console.warn('[bg] Mic capture failed:', micResult?.error);
+        }
+      } catch (err) {
+        console.warn('[bg] Mic capture request failed:', err.message);
+      }
+    }
+
+    const startTime = Date.now();
+
+    await setState({
+      isRecording: true,
+      meetTabId: tabId,
+      startTime: startTime,
+      recordingStatus: 'recording',
+      wasInterrupted: false,
+    });
+
+    console.log('[bg] ✅ Recording started');
+
+    sendResponse({
+      success: true,
+      startTime: startTime,
+      meetTabId: tabId,
+    });
+
+  } catch (err) {
+    console.error('[bg] startRecording error:', err);
+    sendResponse({ success: false, error: err.message });
+  }
+}
+
+/* ────────── Stop recording ────────── */
+
+async function stopRecording(sendResponse) {
+  try {
+    const state = await getState();
+    if (!state.isRecording && state.recordingStatus !== 'recording') {
+      if (sendResponse) sendResponse({ success: true });
+      return;
+    }
+
+    console.log('[bg] Stopping recording...');
+    await setState({ recordingStatus: 'stopping' });
+
+    // Stop content script mic
+    if (state.meetTabId) {
+      try {
+        await chrome.tabs.sendMessage(state.meetTabId, { type: 'STOP_MICROPHONE' });
+      } catch (e) {
+        console.warn('[bg] Could not stop content script mic');
+      }
+    }
+
+    // Stop offscreen recording
+    try {
+      chrome.runtime.sendMessage({ type: 'OFFSCREEN_STOP_RECORDING' });
+    } catch (e) {
+      console.warn('[bg] Could not stop offscreen');
+    }
+
+    // Wait for encoding
+    setTimeout(async () => {
+      await resetState();
+      setTimeout(async () => {
+        try { await closeOffscreenDocument(); } catch (e) {}
+      }, 10000);
+    }, 2000);
+
+    if (sendResponse) sendResponse({ success: true });
+
+  } catch (err) {
+    console.error('[bg] stop error:', err);
+    await resetState();
+    if (sendResponse) sendResponse({ success: false, error: err.message });
+  }
+}
+
+/* ────────── Message handler ────────── */
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || !message.type) return false;
+
+  switch (message.type) {
+
+    case 'GET_STATUS':
+      getState().then(sendResponse);
+      return true;
+
+    case 'START_RECORDING':
+      startRecording(sendResponse);
+      return true;
+
+    case 'STOP_RECORDING':
+      stopRecording(sendResponse);
+      return true;
+
+    case 'CLEAR_INTERRUPTED':
+      setState({ wasInterrupted: false }).then(() => sendResponse({ success: true }));
+      return true;
+
+    case 'MIC_PCM_DATA':
+      // Forward mic PCM data from content script to offscreen
+      // This is the critical path — mic audio flows through here
+      chrome.runtime.sendMessage({
+        type: 'OFFSCREEN_MIC_PCM',
+        pcm: message.pcm,
+        sampleRate: message.sampleRate,
+      });
+      return false;
+
+    case 'RECORDING_DOWNLOAD_COMPLETE':
+      console.log('[bg] ✅ Download complete');
+      resetState().then(() => {
+        setTimeout(() => closeOffscreenDocument().catch(() => {}), 2000);
+      });
+      return false;
+
+    case 'RECORDING_ERROR':
+      console.error('[bg] Recording error:', message.error);
+      resetState();
+      return false;
+
+    default:
+      return false;
+  }
+});
+
+/* ────────── Tab events ────────── */
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const state = await getState();
+  if (state.isRecording && state.meetTabId === tabId) {
+    console.log('[bg] Meet tab closed');
+    await stopRecording(null);
+  }
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (!changeInfo.url) return;
+  const state = await getState();
+  if (state.isRecording && state.meetTabId === tabId) {
+    if (!changeInfo.url.startsWith('https://meet.google.com/')) {
+      console.log('[bg] Left Meet');
+      await stopRecording(null);
+    }
+  }
+});
+
+/* ────────── Startup ────────── */
+
+chrome.runtime.onStartup.addListener(async () => {
+  const state = await getState();
+  if (state.isRecording) {
+    await setState({ ...DEFAULT_STATE, wasInterrupted: true });
+  }
+});
+
+chrome.runtime.onInstalled.addListener(async () => {
+  const state = await getState();
+  if (state.isRecording) {
+    await setState({ ...DEFAULT_STATE, wasInterrupted: true });
+  }
+});
