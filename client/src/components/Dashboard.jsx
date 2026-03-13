@@ -6,7 +6,7 @@ import axios from 'axios';
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   // Data processing state
   const [processingData, setProcessingData] = useState(false);
   const [processedData, setProcessedData] = useState(null);
@@ -82,9 +82,9 @@ const Dashboard = () => {
         { analysisText },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
-      return response.data.issues && response.data.issues.length > 0 
-        ? response.data.issues 
+
+      return response.data.issues && response.data.issues.length > 0
+        ? response.data.issues
         : null;
     } catch (err) {
       console.error('Error extracting GitHub issues:', err);
@@ -184,23 +184,23 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-linear-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+    <div className="min-h-screen bg-[#F0F4F2] text-[#3D5249] font-sans">
+      <header className="bg-[#0C1A15] text-[#FFFFFF] shadow-lg sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">AI Meeting Processor</h1>
-            <p className="text-indigo-100 mt-1">Welcome, {user?.name}</p>
+            <h1 className="text-3xl font-bold font-syne tracking-tight">Meeting.AI</h1>
+            <p className="text-[#8FA89F] mt-1 text-sm">Dashboard — {user?.name}</p>
           </div>
           <div className="space-x-4">
             <button
               onClick={() => navigate('/settings')}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg transition"
+              className="bg-[#FFFFFF]/10 hover:bg-[#FFFFFF]/20 text-[#FFFFFF] font-semibold py-2 px-6 rounded-lg transition-all border border-[#FFFFFF]/10"
             >
-              ⚙️ Settings
+              Settings
             </button>
             <button
               onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-lg transition"
+              className="bg-[#B91C1C]/10 hover:bg-[#B91C1C]/20 text-[#B91C1C] font-semibold py-2 px-6 rounded-lg transition-all border border-[#B91C1C]/20"
             >
               Logout
             </button>
@@ -217,10 +217,10 @@ const Dashboard = () => {
         )}
 
         {/* Data Processing Section */}
-        <div className="bg-white rounded-lg shadow p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Process Meeting Data</h2>
-          <p className="text-gray-600 text-sm mb-6">Analyze meeting transcripts using dual-perspective AI agents (Technical + Business)</p>
-          
+        <div className="bg-[#FFFFFF] rounded-2xl border border-[#D4E0DA] p-8 mb-8 shadow-sm">
+          <h2 className="text-2xl font-bold font-syne text-[#0C1A15] mb-2">Process Meeting Data</h2>
+          <p className="text-[#7A9489] text-sm mb-6">Analyze meeting transcripts using dual-perspective AI agents</p>
+
           {availableData.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <p className="text-lg">No data available to process</p>
@@ -228,14 +228,14 @@ const Dashboard = () => {
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-[13px] font-bold text-[#3D5249] mb-2 px-1">
                   Select Meeting Data
                 </label>
                 <select
                   value={selectedDataIndex}
                   onChange={(e) => setSelectedDataIndex(parseInt(e.target.value))}
                   disabled={processingData}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 bg-[#F7FAF8] border border-[#D4E0DA] rounded-xl text-[#0C1A15] font-medium focus:ring-2 focus:ring-[#B45309]/20 transition-all outline-none"
                 >
                   {availableData.map((data, idx) => (
                     <option key={idx} value={idx}>
@@ -248,9 +248,9 @@ const Dashboard = () => {
               <button
                 onClick={handleProcessData}
                 disabled={processingData}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition text-lg"
+                className="w-full bg-gradient-to-r from-[#B45309] to-[#F59E0B] hover:shadow-[0_8px_25px_rgba(180,83,9,0.25)] disabled:opacity-50 text-[#FFFFFF] font-bold py-4 px-4 rounded-xl transition-all text-lg hover:scale-[1.01]"
               >
-                {processingData ? 'Processing...' : '🚀 Process with AI'}
+                {processingData ? 'Analysing Transcript...' : '🚀 Process with AI'}
               </button>
             </div>
           )}
@@ -260,36 +260,36 @@ const Dashboard = () => {
         {processedData && (
           <div className="space-y-6">
             {/* Meeting Header */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{processedData.title}</h2>
-              <p className="text-gray-600 text-sm">Processed at: {new Date(processedData.timestamp).toLocaleString()}</p>
+            <div className="bg-[#FFFFFF] rounded-xl border border-[#D4E0DA] p-6 shadow-sm">
+              <h2 className="text-2xl font-bold font-syne text-[#0C1A15] mb-2">{processedData.title}</h2>
+              <p className="text-[#7A9489] text-xs font-mono uppercase tracking-wider">Processed: {new Date(processedData.timestamp).toLocaleDateString()}</p>
             </div>
 
             {/* Technical Agent Output */}
-            <div className="bg-blue-50 rounded-lg shadow overflow-hidden">
-              <div className="bg-blue-600 text-white p-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <span className="bg-blue-700 px-3 py-1 rounded-full text-sm">TECHNICAL</span>
+            <div className="bg-[#FFFFFF] rounded-2xl border border-[#D4E0DA] shadow-sm overflow-hidden">
+              <div className="bg-[#B45309]/5 border-b border-[#D4E0DA] p-5">
+                <h3 className="text-lg font-bold font-syne flex items-center gap-3 text-[#B45309]">
+                  <span className="bg-[#FEF3C7] text-[#B45309] px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">TECHNICAL</span>
                   Technical Analysis & Architecture
                 </h3>
               </div>
               <div className="p-6">
-                <div className="bg-white p-4 rounded border border-blue-200 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                <div className="bg-[#F7FAF8] p-6 rounded-xl border border-[#D4E0DA] max-h-[500px] overflow-y-auto whitespace-pre-wrap text-[14px] text-[#3D5249] leading-relaxed font-mono shadow-inner">
                   {processedData.technical.analysis}
                 </div>
               </div>
             </div>
 
             {/* Non-Technical Agent Output */}
-            <div className="bg-green-50 rounded-lg shadow overflow-hidden">
-              <div className="bg-green-600 text-white p-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <span className="bg-green-700 px-3 py-1 rounded-full text-sm">BUSINESS</span>
+            <div className="bg-[#FFFFFF] rounded-2xl border border-[#D4E0DA] shadow-sm overflow-hidden">
+              <div className="bg-[#3D5249]/5 border-b border-[#D4E0DA] p-5">
+                <h3 className="text-lg font-bold font-syne flex items-center gap-3 text-[#3D5249]">
+                  <span className="bg-[#E8F0EC] text-[#3D5249] px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">NON-TECH</span>
                   Business & Strategic Analysis
                 </h3>
               </div>
               <div className="p-6">
-                <div className="bg-white p-4 rounded border border-green-200 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                <div className="bg-[#F7FAF8] p-6 rounded-xl border border-[#D4E0DA] max-h-[500px] overflow-y-auto whitespace-pre-wrap text-[14px] text-[#3D5249] leading-relaxed shadow-inner">
                   {processedData.nonTechnical.analysis}
                 </div>
               </div>
@@ -297,46 +297,46 @@ const Dashboard = () => {
 
             {/* GitHub Integration Section */}
             {githubSettings?.validated && (
-              <div className="bg-orange-50 rounded-lg shadow overflow-hidden">
-                <div className="bg-orange-600 text-white p-4">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <span className="bg-orange-700 px-3 py-1 rounded-full text-sm">GITHUB</span>
-                    Create GitHub Issues from Technical Data
+              <div className="bg-[#FFFFFF] rounded-2xl border border-[#D97706]/30 shadow-md overflow-hidden">
+                <div className="bg-gradient-to-r from-[#B45309] to-[#D97706] text-[#FFFFFF] p-5">
+                  <h3 className="text-lg font-bold font-syne flex items-center gap-3">
+                    <span className="bg-[#FFFFFF]/20 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">GITHUB</span>
+                    Generate Issue Pipeline
                   </h3>
                 </div>
                 <div className="p-6 space-y-4">
-                  <p className="text-gray-700 text-sm">
-                    Found potential GitHub issues in technical analysis. Click below to create issues in:
+                  <p className="text-[#3D5249] text-sm">
+                    Automate task creation directly into your repository:
                   </p>
-                  <p className="text-gray-800 font-semibold">
+                  <p className="text-[#0C1A15] font-bold px-3 py-2 bg-[#F0F4F2] rounded-lg inline-block border border-[#D4E0DA]">
                     {githubSettings.owner}/{githubSettings.repo}
                   </p>
 
                   <button
                     onClick={handleCreateGitHubIssues}
                     disabled={creatingIssues}
-                    className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition"
+                    className="w-full bg-[#0C1A15] hover:bg-[#1A2E26] disabled:opacity-50 text-[#FFFFFF] font-bold py-4 px-4 rounded-xl transition-all shadow-lg hover:scale-[1.01]"
                   >
-                    {creatingIssues ? 'Creating Issues...' : '📝 Create GitHub Issues'}
+                    {creatingIssues ? 'Syncing...' : '📝 Extract & Create Issues'}
                   </button>
                 </div>
               </div>
             )}
 
             {!githubSettings?.validated && (
-              <div className="bg-yellow-50 rounded-lg shadow overflow-hidden">
-                <div className="bg-yellow-600 text-white p-4">
-                  <h3 className="text-xl font-bold">GitHub Not Configured</h3>
+              <div className="bg-[#FFFFFF] rounded-2xl border border-[#D4E0DA] shadow-sm overflow-hidden">
+                <div className="bg-[#FEF3C7] text-[#B45309] p-5">
+                  <h3 className="text-lg font-bold font-syne uppercase tracking-wider">GitHub Link Pending</h3>
                 </div>
                 <div className="p-6 space-y-4">
-                  <p className="text-gray-700">
+                  <p className="text-[#3D5249] text-sm">
                     Configure GitHub in Settings to enable automatic issue creation from technical analysis.
                   </p>
                   <button
                     onClick={() => navigate('/settings')}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                    className="bg-[#B45309] hover:bg-[#D97706] text-[#FFFFFF] font-bold py-2.5 px-6 rounded-lg transition-all shadow-md"
                   >
-                    Go to Settings
+                    Open Settings
                   </button>
                 </div>
               </div>
@@ -345,9 +345,9 @@ const Dashboard = () => {
             {/* Clear Button */}
             <button
               onClick={() => setProcessedData(null)}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              className="w-full text-[#7A9489] hover:text-[#0C1A15] font-bold py-3 transition-colors"
             >
-              Clear Results
+              Clear Analysis Data
             </button>
           </div>
         )}
