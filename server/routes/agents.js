@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
-import { rootAgent, agentMemory, githubAgent, nonTechnicalAgent, emailAgent, calendarAgent } from '../agents/index.js';
+import { rootAgent, agentMemory, githubAgent, nonTechnicalAgent, emailAgent, calendarAgent, notionAgent } from '../agents/index.js';
 import trelloAgent from '../agents/trelloAgent.js';
 import authMiddleware from '../middleware/auth.js';
 import Meeting from '../models/Meeting.js';
@@ -1031,6 +1031,113 @@ router.post('/create-trello-cards', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating Trello cards:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Notion Agents
+router.post('/extract-notion-summary', authMiddleware, async (req, res) => {
+  try {
+    const { dataIndex } = req.body;
+
+    const dataPath = path.join(__dirname, '../data/data1.json');
+    const rawData = fs.readFileSync(dataPath, 'utf8');
+    const parsedData = JSON.parse(rawData);
+    const meetings = parsedData.meetings || parsedData;
+
+    if (dataIndex === undefined || !meetings[dataIndex]) {
+      return res.status(400).json({ success: false, error: 'Invalid data index' });
+    }
+
+    const transcript = meetings[dataIndex].transcript;
+    const summary = await notionAgent.generateSummary(transcript);
+
+    return res.json({
+      success: true,
+      summary
+    });
+  } catch (error) {
+    console.error('Error generating Notion summary:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/create-notion-page', authMiddleware, async (req, res) => {
+  try {
+    const { summary, title } = req.body;
+
+    if (!summary) {
+      return res.status(400).json({ success: false, error: 'No summary provided' });
+    }
+
+    const settings = await Settings.findOne({ userId: req.user.id });
+    const notionKey = settings?.notion?.apiKey;
+    const databaseId = settings?.notion?.databaseId;
+
+    if (!notionKey || !databaseId) {
+      return res.json({
+        success: true,
+        note: 'Mocked locally. Add Notion Credentials in Settings to push this summary to a real Notion database.',
+        pageUrl: 'https://notion.so/mock-page-id'
+      });
+    }
+
+    // Split markdown summary into blocks (Notion blocks have 2000 char limits)
+    // We will do a basic split by newlines for paragraph blocks
+    const chunks = summary.split('\n').filter(p => p.trim().length > 0);
+    const childrenBlocks = chunks.map(chunk => ({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: chunk.substring(0, 1999) // ensure limit is met
+            }
+          }
+        ]
+      }
+    }));
+
+    // If the ID acts as a normal "page" instead of a true structured "database", 
+    // the parent object structure needs to reflect that.
+    const requestBody = {
+      parent: { 
+        // We will try appending it to a page based on that error
+        type: "page_id",
+        page_id: databaseId
+      },
+      properties: {
+        title: [
+          { text: { content: title || 'Meeting Summary' } }
+        ]
+      },
+      children: childrenBlocks.slice(0, 100) // max 100 blocks per request
+    };
+
+    const response = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${notionKey}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Notion API Error');
+    }
+
+    return res.json({
+      success: true,
+      pageUrl: data.url
+    });
+  } catch (error) {
+    console.error('Error creating Notion page:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

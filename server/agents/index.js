@@ -7,6 +7,7 @@ export { default as nonTechnicalAgent } from './nonTechnicalAgent.js';
 export { default as emailAgent } from './emailAgent.js';
 export { default as calendarAgent } from './calendarAgent.js';
 export { default as trelloAgent } from './trelloAgent.js';
+export { default as notionAgent } from './notionAgent.js';
 export { agentConfig, systemPrompt } from './config.js';
 
 // Agent factory
