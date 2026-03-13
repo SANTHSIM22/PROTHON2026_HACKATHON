@@ -18,6 +18,40 @@ const Dashboard = () => {
   const [showIssueConfirmation, setShowIssueConfirmation] = useState(false);
   const [extractedIssues, setExtractedIssues] = useState([]);
   const [selectedIssues, setSelectedIssues] = useState({});
+  
+  // New GitHub features state
+  const [createdIssueNumbers, setCreatedIssueNumbers] = useState([]);
+  const [showAssignIssues, setShowAssignIssues] = useState(false);
+  const [assignees, setAssignees] = useState({});
+  const [assigningIssues, setAssigningIssues] = useState(false);
+  const [creatingPR, setCreatingPR] = useState(false);
+  const [showPRConfirmation, setShowPRConfirmation] = useState(false);
+  const [extractedPRs, setExtractedPRs] = useState([]);
+  const [selectedPRs, setSelectedPRs] = useState({});
+
+  // Email features state
+  const [contacts, setContacts] = useState([]);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
+  const [extractedEmails, setExtractedEmails] = useState([]);
+  const [selectedEmails, setSelectedEmails] = useState({});
+  const [sendingEmails, setSendingEmails] = useState(false);
+
+  // Calendar features state
+  const [showEventConfirmation, setShowEventConfirmation] = useState(false);
+  const [extractedEvents, setExtractedEvents] = useState([]);
+  const [selectedEvents, setSelectedEvents] = useState({});
+  const [schedulingEvents, setSchedulingEvents] = useState(false);
+
+  // Trello State
+  const [extractedCards, setExtractedCards] = useState([]);
+  const [showTrelloConfirmation, setShowTrelloConfirmation] = useState(false);
+  const [selectedCards, setSelectedCards] = useState({});
+  const [creatingCards, setCreatingCards] = useState(false);
+
+  // Notion State
+  const [extractedSummary, setExtractedSummary] = useState('');
+  const [showNotionConfirmation, setShowNotionConfirmation] = useState(false);
+  const [creatingNotionPage, setCreatingNotionPage] = useState(false);
 
   useEffect(() => {
     fetchAvailableData();
@@ -45,8 +79,11 @@ const Dashboard = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setGithubSettings(response.data.settings.github);
+      if (response.data.settings.contacts) {
+        setContacts(response.data.settings.contacts);
+      }
     } catch (err) {
-      console.error('Failed to load GitHub settings:', err);
+      console.error('Failed to load Settings details:', err);
     }
   };
 
@@ -92,6 +129,58 @@ const Dashboard = () => {
     }
   };
 
+  const extractGitHubPRs = async (analysisText) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/extract-github-pull-requests',
+        { analysisText },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      return response.data.pullRequests && response.data.pullRequests.length > 0 
+        ? response.data.pullRequests 
+        : null;
+    } catch (err) {
+      console.error('Error extracting GitHub PRs:', err);
+      return null;
+    }
+  };
+
+  const extractEmailsAPI = async (idx) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/extract-emails',
+        { dataIndex: idx },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data.emails && response.data.emails.length > 0 
+        ? response.data.emails 
+        : null;
+    } catch (err) {
+      console.error('Error extracting Emails:', err);
+      return null;
+    }
+  };
+
+  const extractEventsAPI = async (idx) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/extract-events',
+        { dataIndex: idx },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data.events && response.data.events.length > 0 
+        ? response.data.events 
+        : null;
+    } catch (err) {
+      console.error('Error extracting Events:', err);
+      return null;
+    }
+  };
+
   const handleCreateGitHubIssues = async () => {
     if (!githubSettings?.validated) {
       setError('GitHub is not configured. Please go to Settings to configure it.');
@@ -126,6 +215,116 @@ const Dashboard = () => {
       console.error(err);
     } finally {
       setProcessingData(false);
+    }
+  };
+
+  const handleExtractTrelloCards = async () => {
+    try {
+      setProcessingData(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/extract-trello-cards',
+        { dataIndex: selectedDataIndex },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setExtractedCards(response.data.cards);
+      
+      const initialSelection = {};
+      response.data.cards.forEach((_, idx) => {
+        initialSelection[idx] = true; 
+      });
+      setSelectedCards(initialSelection);
+      
+      setShowTrelloConfirmation(true);
+      setError('');
+    } catch (err) {
+      setError(`Failed to extract Trello Cards: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setProcessingData(false);
+    }
+  };
+
+  const handleToggleCard = (index) => {
+    setSelectedCards(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleConfirmCards = async () => {
+    const cardsToCreate = extractedCards.filter((_, index) => selectedCards[index]);
+    
+    if (cardsToCreate.length === 0) return;
+
+    setCreatingCards(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/create-trello-cards',
+        { cards: cardsToCreate },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.failureCount > 0) {
+        const errorMsgs = response.data.results.filter(r => !r.success).map(r => r.error).join(', ');
+        alert(`Created ${response.data.successCount} cards. Failed ${response.data.failureCount} cards. Errors: ${errorMsgs}`);
+      } else {
+        alert(response.data.note ? response.data.note : `Successfully created ${response.data.successCount} Trello card(s)!`);
+      }
+      setShowTrelloConfirmation(false);
+    } catch (err) {
+      setError(`Failed to create cards: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setCreatingCards(false);
+    }
+  };
+
+  const handleExtractNotionSummary = async () => {
+    try {
+      setProcessingData(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/extract-notion-summary',
+        { dataIndex: selectedDataIndex },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setExtractedSummary(response.data.summary);
+      setShowNotionConfirmation(true);
+      setError('');
+    } catch (err) {
+      setError(`Failed to extract Notion Summary: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setProcessingData(false);
+    }
+  };
+
+  const handleConfirmNotionSummary = async () => {
+    if (!extractedSummary) return;
+
+    setCreatingNotionPage(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/create-notion-page',
+        { 
+          summary: extractedSummary,
+          title: `Meeting Summary - ${new Date().toLocaleDateString()}`
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.pageUrl) {
+        alert(`Successfully generated Notion summary page! \n\n${response.data.pageUrl}`);
+      } else {
+        alert(response.data.note ? response.data.note : `Successfully generated Notion summary page!`);
+      }
+      setShowNotionConfirmation(false);
+    } catch (err) {
+      setError(`Failed to push to Notion: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setCreatingNotionPage(false);
     }
   };
 
@@ -166,6 +365,12 @@ const Dashboard = () => {
       setError('');
       const successCount = response.data.successCount || response.data.issues?.filter(i => i.success).length || 0;
       if (successCount > 0) {
+        // Extract created issue numbers for further operations
+        const issueNumbers = response.data.issues
+          ?.filter(i => i.success && i.issueNumber)
+          ?.map(i => i.issueNumber) || [];
+        setCreatedIssueNumbers(issueNumbers);
+        
         alert(`Successfully created ${successCount} GitHub issue(s)! \n\n${response.data.issues?.map(i => i.url || i.title).join('\n')}`);
       } else {
         setError('No issues were successfully created. Check your GitHub settings.');
@@ -175,6 +380,255 @@ const Dashboard = () => {
       setError(`Failed to create GitHub issues: ${err.response?.data?.error || err.message}`);
     } finally {
       setCreatingIssues(false);
+    }
+  };
+
+  const handleAssignIssues = async () => {
+    const selectedAssignments = Object.entries(assignees)
+      .filter(([_, value]) => value && value.length > 0)
+      .map(([issueNum, users]) => ({
+        issueNumber: parseInt(issueNum),
+        assignees: users.split(',').map(u => u.trim()).filter(Boolean),
+      }));
+
+    if (selectedAssignments.length === 0) {
+      setError('Please assign at least one issue');
+      return;
+    }
+
+    setAssigningIssues(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/assign-issues',
+        { issueAssignments: selectedAssignments },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      alert(`Successfully assigned ${response.data.successCount} issue(s)`);
+      setShowAssignIssues(false);
+      setAssignees({});
+    } catch (err) {
+      setError(`Failed to assign issues: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setAssigningIssues(false);
+    }
+  };
+
+  const handleExtractAndCreatePRs = async () => {
+    if (!githubSettings?.validated) {
+      setError('GitHub is not configured. Please go to Settings to configure it.');
+      return;
+    }
+
+    if (!processedData?.technical?.analysis) {
+      setError('No technical analysis available');
+      return;
+    }
+
+    try {
+      setProcessingData(true);
+      const prs = await extractGitHubPRs(processedData.technical.analysis);
+
+      if (!prs || prs.length === 0) {
+        setError('No GitHub pull requests found in technical analysis');
+        setProcessingData(false);
+        return;
+      }
+
+      setExtractedPRs(prs);
+      const initialSelected = {};
+      prs.forEach((_, idx) => {
+        initialSelected[idx] = true;
+      });
+      setSelectedPRs(initialSelected);
+      setShowPRConfirmation(true);
+    } catch (err) {
+      setError('Failed to extract GitHub Pull Requests');
+      console.error(err);
+    } finally {
+      setProcessingData(false);
+    }
+  };
+
+  const handleTogglePR = (index) => {
+    setSelectedPRs(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleConfirmPRs = async () => {
+    const prsToCreate = extractedPRs.filter((_, index) => selectedPRs[index]);
+    
+    if (prsToCreate.length === 0) return;
+
+    setCreatingPR(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/create-pull-requests',
+        { pullRequests: prsToCreate },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.failureCount > 0) {
+        const errorMsg = response.data.pullRequests.find(pr => !pr.success)?.error || 'Unknown error';
+        alert(`Created ${response.data.successCount} PR(s). Failed to create ${response.data.failureCount} PR(s). Reason: ${errorMsg}\n\nNote: GitHub only allows ONE open pull request between the exact same two branches ('test' to 'main') at a time.`);
+      } else {
+        alert(`Successfully created ${response.data.successCount} pull request(s)`);
+      }
+      setShowPRConfirmation(false);
+    } catch (err) {
+      setError(`Failed to create pull requests: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setCreatingPR(false);
+    }
+  };
+
+  const handleExtractAndSendEmails = async () => {
+    try {
+      setProcessingData(true);
+      const emails = await extractEmailsAPI(selectedDataIndex);
+
+      if (!emails || emails.length === 0) {
+        setError('No Email Tasks found in the transcript');
+        setProcessingData(false);
+        return;
+      }
+
+      // Filter matched contacts
+      const validEmails = emails.map(emailTask => {
+        const contact = contacts.find(c => c.name.toLowerCase() === emailTask.name.toLowerCase());
+        return {
+          ...emailTask,
+          emailAddress: contact ? contact.emailAddress : null,
+          isValid: !!contact
+        };
+      });
+
+      setExtractedEmails(validEmails);
+      
+      const initialSelected = {};
+      validEmails.forEach((e, idx) => {
+        initialSelected[idx] = e.isValid; // only auto-check if valid
+      });
+      setSelectedEmails(initialSelected);
+      setShowEmailConfirmation(true);
+    } catch (err) {
+      setError('Failed to extract Emails');
+      console.error(err);
+    } finally {
+      setProcessingData(false);
+    }
+  };
+
+  const handleToggleEmail = (index) => {
+    setSelectedEmails(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleConfirmEmails = async () => {
+    const emailsToSend = extractedEmails.filter((_, index) => selectedEmails[index]);
+    
+    // Safety check ensuring we only send to configured addresses
+    const invalidAttempts = emailsToSend.filter(e => !e.isValid);
+    if (invalidAttempts.length > 0) {
+      setError('One or more selected emails are missing a configured email address. Please update Contacts in Settings.');
+      return;
+    }
+
+    if (emailsToSend.length === 0) return;
+
+    setSendingEmails(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/send-emails',
+        { emailTasks: emailsToSend },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const sentCount = response.data.successCount;
+      const previewLinks = response.data.results
+        .map(r => r.previewUrl)
+        .filter(url => url)
+        .join('\n');
+
+      if (previewLinks) {
+        alert(`Successfully sent ${sentCount} email(s)!\n\nView them here:\n${previewLinks}`);
+      } else {
+        alert(`Successfully sent ${sentCount} email(s) via SMTP!`);
+      }
+      setShowEmailConfirmation(false);
+    } catch (err) {
+      setError(`Failed to send emails: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSendingEmails(false);
+    }
+  };
+
+  const handleExtractAndScheduleEvents = async () => {
+    try {
+      setProcessingData(true);
+      const events = await extractEventsAPI(selectedDataIndex);
+
+      if (!events || events.length === 0) {
+        setError('No Calendar Events found in the transcript');
+        setProcessingData(false);
+        return;
+      }
+
+      setExtractedEvents(events);
+      
+      const initialSelected = {};
+      events.forEach((_, idx) => {
+        initialSelected[idx] = true;
+      });
+      setSelectedEvents(initialSelected);
+      setShowEventConfirmation(true);
+    } catch (err) {
+      setError('Failed to extract Calendar Events');
+      console.error(err);
+    } finally {
+      setProcessingData(false);
+    }
+  };
+
+  const handleToggleEvent = (index) => {
+    setSelectedEvents(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleConfirmEvents = async () => {
+    const eventsToSchedule = extractedEvents.filter((_, index) => selectedEvents[index]);
+    
+    if (eventsToSchedule.length === 0) return;
+
+    setSchedulingEvents(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'http://localhost:5000/api/agents/create-calendar-events',
+        { events: eventsToSchedule },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.failureCount > 0) {
+        const errorMsgs = response.data.results.filter(r => !r.success).map(r => r.error).join(', ');
+        alert(`Scheduled ${response.data.successCount} events. Failed ${response.data.failureCount} events. Errors: ${errorMsgs}`);
+      } else {
+        alert(response.data.note ? response.data.note : `Successfully scheduled ${response.data.successCount} event(s) to Calendar!`);
+      }
+      setShowEventConfirmation(false);
+    } catch (err) {
+      setError(`Failed to schedule events: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSchedulingEvents(false);
     }
   };
 
@@ -288,9 +742,49 @@ const Dashboard = () => {
                   Business & Strategic Analysis
                 </h3>
               </div>
-              <div className="p-6">
+              <div className="p-6 space-y-4">
                 <div className="bg-white p-4 rounded border border-green-200 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
                   {processedData.nonTechnical.analysis}
+                </div>
+                
+                {/* Extract Emails Section */}
+                <div className="border-t border-green-200 pt-4">
+                  <h4 className="font-semibold text-green-800 mb-2">Automated Communications</h4>
+                  <p className="text-sm text-gray-600 mb-4">Extract email tasks mentioned in the transcript to send updates and approvals directly to stakeholders configured in your Settings.</p>
+                  <button
+                    onClick={handleExtractAndSendEmails}
+                    disabled={processingData}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                  >
+                    {processingData ? (
+                      <>
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                        Scanning...
+                      </>
+                    ) : (
+                      '📧 Extract & Send Emails'
+                    )}
+                  </button>
+                </div>
+
+                {/* Extract Calendar Section */}
+                <div className="border-t border-green-200 pt-4">
+                  <h4 className="font-semibold text-green-800 mb-2">Calendar & Scheduling</h4>
+                  <p className="text-sm text-gray-600 mb-4">Extract events, holidays, and meetings from the transcript and schedule them on your Google Calendar.</p>
+                  <button
+                    onClick={handleExtractAndScheduleEvents}
+                    disabled={processingData}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                  >
+                    {processingData ? (
+                      <>
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                        Scanning...
+                      </>
+                    ) : (
+                      '📅 Extract & Schedule Events'
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -337,6 +831,124 @@ const Dashboard = () => {
                     className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition"
                   >
                     Go to Settings
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Non-Tech Extractor Block - Trello */}
+            <div className="bg-sky-50 rounded-lg shadow overflow-hidden">
+              <div className="bg-sky-600 text-white p-4">
+                <h3 className="text-xl font-bold">Non-Technical Task Extraction (Trello)</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-gray-700">
+                  Analyze the transcript for tasks that should be put into Trello cards.
+                </p>
+                <button
+                  onClick={handleExtractTrelloCards}
+                  disabled={processingData}
+                  className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition"
+                >
+                  {processingData ? 'Extracting...' : '📋 Extract Trello Cards'}
+                </button>
+              </div>
+            </div>
+
+            {/* Non-Tech Extractor Block - Notion Summaries */}
+            <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-gray-900 text-white p-4">
+                <h3 className="text-xl font-bold">Meeting Summary (Notion)</h3>
+              </div>
+              <div className="p-6 space-y-4 bg-gray-50">
+                <p className="text-gray-700">
+                  Analyze the transcript to generate a comprehensive markdown summary formatted for Notion.
+                </p>
+                <button
+                  onClick={handleExtractNotionSummary}
+                  disabled={processingData}
+                  className="w-full bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition"
+                >
+                  {processingData ? 'Extracting...' : '📓 Generate Notion Summary'}
+                </button>
+              </div>
+            </div>
+
+            {/* Assign Issues Section */}
+            {githubSettings?.validated && createdIssueNumbers.length > 0 && (
+              <div className="bg-purple-50 rounded-lg shadow overflow-hidden">
+                <div className="bg-purple-600 text-white p-4">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <span className="bg-purple-700 px-3 py-1 rounded-full text-sm">ASSIGN</span>
+                    Assign Issues to Team Members
+                  </h3>
+                </div>
+                <div className="p-6 space-y-4">
+                  <p className="text-gray-700 text-sm">
+                    Assign created issues to your team members for better task distribution.
+                  </p>
+                  <button
+                    onClick={() => setShowAssignIssues(!showAssignIssues)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                  >
+                    {showAssignIssues ? '✓ Hide Assignments' : '👥 Assign Issues'}
+                  </button>
+                  
+                  {showAssignIssues && (
+                    <div className="border-t pt-4 space-y-3">
+                      {createdIssueNumbers.map(issueNum => (
+                        <div key={issueNum} className="flex flex-col gap-2">
+                          <label className="text-sm font-medium text-gray-700">
+                            Issue #{issueNum} - Assign to (comma separated GitHub usernames):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g., john, sarah, mike"
+                            value={assignees[issueNum] || ''}
+                            onChange={(e) => setAssignees({...assignees, [issueNum]: e.target.value})}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        onClick={handleAssignIssues}
+                        disabled={assigningIssues}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition"
+                      >
+                        {assigningIssues ? 'Assigning...' : 'Confirm Assignments'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Extract Pull Requests Section */}
+            {githubSettings?.validated && (
+              <div className="bg-indigo-50 rounded-lg shadow overflow-hidden">
+                <div className="bg-indigo-600 text-white p-4">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <span className="bg-indigo-700 px-3 py-1 rounded-full text-sm">PR</span>
+                    Extract Pull Requests (test → main)
+                  </h3>
+                </div>
+                <div className="p-6 space-y-4">
+                  <p className="text-gray-700 text-sm">
+                    Extract Pull Requests from the technical analysis to create them automatically.
+                  </p>
+                  <button
+                    onClick={handleExtractAndCreatePRs}
+                    disabled={processingData}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                  >
+                    {processingData ? (
+                      <>
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                        Extracting PRs...
+                      </>
+                    ) : (
+                      '🔀 Extract Pull Requests'
+                    )}
                   </button>
                 </div>
               </div>
@@ -421,6 +1033,300 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* GitHub PR Confirmation Modal */}
+      {showPRConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="bg-indigo-600 text-white p-6">
+              <h2 className="text-2xl font-bold">Confirm Pull Requests</h2>
+              <p className="text-indigo-100 mt-2">
+                Review and select the pull requests you want to create in {githubSettings?.owner}/{githubSettings?.repo}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {extractedPRs.map((pr, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-blue-50 transition">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      id={`pr-${index}`}
+                      checked={selectedPRs[index] || false}
+                      onChange={() => handleTogglePR(index)}
+                      className="mt-1 w-5 h-5 text-indigo-600 rounded cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`pr-${index}`} className="cursor-pointer">
+                        <p className="font-semibold text-gray-800">{pr.title}</p>
+                        <p className="text-gray-600 text-sm mt-1">{pr.description}</p>
+                        <p className="text-gray-500 text-xs mt-1">Branch: {pr.head} → {pr.base}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {pr.labels?.map((label, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Selection Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                <p className="text-blue-900 font-semibold">
+                  {Object.values(selectedPRs).filter(Boolean).length} of {extractedPRs.length} PRs selected
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-6 flex gap-4 justify-end border-t">
+              <button
+                onClick={() => setShowPRConfirmation(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPRs}
+                disabled={creatingPR || Object.values(selectedPRs).every(v => !v)}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition"
+              >
+                {creatingPR ? 'Creating...' : `Create ${Object.values(selectedPRs).filter(Boolean).length} PRs`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {showEmailConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="bg-green-600 text-white p-6">
+              <h2 className="text-2xl font-bold">Confirm Outbound Emails</h2>
+              <p className="text-green-100 mt-2">
+                Review the emails before sending. Unconfigured contacts cannot be selected.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {extractedEmails.map((email, index) => (
+                <div key={index} className={`border rounded-lg p-4 transition ${email.isValid ? 'border-gray-200 hover:bg-green-50' : 'border-red-200 bg-red-50 opacity-75'}`}>
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      id={`email-${index}`}
+                      checked={selectedEmails[index] || false}
+                      onChange={() => handleToggleEmail(index)}
+                      disabled={!email.isValid}
+                      className="mt-1 w-5 h-5 text-green-600 rounded cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`email-${index}`} className={email.isValid ? "cursor-pointer" : "cursor-not-allowed"}>
+                        <div className="flex justify-between items-start">
+                          <p className="font-semibold text-gray-800">To: {email.name}</p>
+                          {email.isValid ? (
+                            <span className="text-xs font-mono bg-green-100 text-green-800 px-2 py-1 rounded">{email.emailAddress}</span>
+                          ) : (
+                            <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-1 rounded">Missing Email in Settings</span>
+                          )}
+                        </div>
+                        <p className="font-medium text-gray-800 mt-2">Subject: {email.subject}</p>
+                        <p className="text-gray-600 text-sm mt-1 border-l-2 border-gray-300 pl-3 italic">"{email.context}"</p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Selection Summary */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
+                <p className="text-green-900 font-semibold">
+                  {Object.values(selectedEmails).filter(Boolean).length} of {extractedEmails.filter(e => e.isValid).length} valid emails selected
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-6 flex gap-4 justify-end border-t">
+              <button
+                onClick={() => setShowEmailConfirmation(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmEmails}
+                disabled={sendingEmails || Object.values(selectedEmails).every(v => !v)}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition"
+              >
+                {sendingEmails ? 'Sending...' : `Send ${Object.values(selectedEmails).filter(Boolean).length} Emails`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Event Confirmation Modal */}
+      {showEventConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div className="bg-blue-600 text-white p-6">
+              <h2 className="text-2xl font-bold">Confirm Calendar Events</h2>
+              <p className="text-blue-100 mt-2">
+                Review the scheduled meetings, holidays, and milestones before adding them.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {extractedEvents.map((event, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 transition hover:bg-blue-50">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      id={`event-${index}`}
+                      checked={selectedEvents[index] || false}
+                      onChange={() => handleToggleEvent(index)}
+                      className="mt-1 w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`event-${index}`} className="cursor-pointer">
+                        <div className="flex justify-between items-start">
+                          <p className="font-semibold text-gray-800">{event.summary}</p>
+                          <span className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {event.date} {event.isAllDay ? '(All Day)' : (event.startTime ? `@ ${event.startTime}` : '')}
+                          </span>
+                        </div>
+                        <p className="font-medium text-gray-800 mt-2 truncate w-full">{event.description}</p>
+                        {event.attendees && event.attendees.length > 0 && (
+                          <p className="text-gray-600 text-sm mt-1 border-l-2 border-gray-300 pl-3 italic">
+                            Attendees: {event.attendees.join(', ')}
+                          </p>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-gray-50 p-6 flex gap-4 justify-end border-t">
+              <button
+                onClick={() => setShowEventConfirmation(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmEvents}
+                disabled={schedulingEvents || Object.values(selectedEvents).every(v => !v)}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition"
+              >
+                {schedulingEvents ? 'Scheduling...' : `Schedule ${Object.values(selectedEvents).filter(Boolean).length} Events`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trello Cards Confirmation Modal */}
+      {showTrelloConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-96 flex flex-col">
+            <div className="bg-sky-600 text-white p-6 shrink-0">
+              <h2 className="text-2xl font-bold">Confirm Trello Cards</h2>
+              <p className="text-sky-100 mt-2">
+                Review these tasks before creating cards in your Trello board.
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              {extractedCards.map((card, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 transition hover:bg-sky-50">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      id={`card-${index}`}
+                      checked={selectedCards[index] || false}
+                      onChange={() => handleToggleCard(index)}
+                      className="mt-1 w-5 h-5 text-sky-600 rounded cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor={`card-${index}`} className="cursor-pointer">
+                        <div className="flex justify-between items-start">
+                          <p className="font-semibold text-gray-800">{card.name}</p>
+                        </div>
+                        <p className="text-sm text-gray-800 mt-2 whitespace-pre-wrap">{card.desc}</p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {extractedCards.length === 0 && (
+                <p className="text-gray-500 italic">No tasks found in transcript suitable for Trello.</p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 p-6 flex gap-4 justify-end border-t shrink-0">
+              <button
+                onClick={() => setShowTrelloConfirmation(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmCards}
+                disabled={creatingCards || extractedCards.filter((_, i) => selectedCards[i]).length === 0}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-semibold disabled:bg-gray-400 transition"
+              >
+                {creatingCards ? 'Creating...' : 'Create Selected Cards'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notion Summary Confirmation Modal */}
+      {showNotionConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col">
+            <div className="bg-gray-900 text-white p-6 shrink-0">
+              <h2 className="text-2xl font-bold">Review Notion Summary</h2>
+              <p className="text-gray-300 mt-2">
+                This Markdown block will be pushed as a new page in your configured Notion Database.
+              </p>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh] bg-gray-50">
+              <div className="bg-white p-6 whitespace-pre-wrap font-mono text-sm border border-gray-200 shadow-inner rounded-sm">
+                {extractedSummary || "No summary was generated."}
+              </div>
+            </div>
+
+            <div className="bg-gray-100 p-6 flex gap-4 justify-end border-t shrink-0">
+              <button
+                onClick={() => setShowNotionConfirmation(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmNotionSummary}
+                disabled={creatingNotionPage || !extractedSummary}
+                className="px-6 py-2 bg-gray-900 hover:bg-black text-white rounded-lg font-semibold disabled:bg-gray-400 transition"
+              >
+                {creatingNotionPage ? 'Pushing to Notion...' : 'Push to Notion'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
