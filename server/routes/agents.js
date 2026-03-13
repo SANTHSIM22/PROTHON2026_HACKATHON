@@ -557,4 +557,113 @@ router.post('/extract-github-issues', authMiddleware, async (req, res) => {
   }
 });
 
+// Extract GitHub PRs from analysis text
+router.post('/extract-github-pull-requests', authMiddleware, async (req, res) => {
+  try {
+    const { analysisText } = req.body;
+
+    if (!analysisText) {
+      return res.status(400).json({
+        success: false,
+        error: 'analysisText is required',
+      });
+    }
+
+    // Use the GitHub agent's extraction method for PRs
+    const pullRequests = githubAgent.extractPullRequests(analysisText);
+
+    return res.json({
+      success: true,
+      pullRequests: pullRequests || [],
+      prsFound: pullRequests ? pullRequests.length : 0,
+    });
+  } catch (error) {
+    console.error('Error extracting GitHub PRs:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Assign GitHub issues to team members
+router.post('/assign-issues', authMiddleware, async (req, res) => {
+  try {
+    const { issueAssignments } = req.body;
+
+    if (!issueAssignments || issueAssignments.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'issueAssignments is required',
+      });
+    }
+
+    const settings = await Settings.findOne({ userId: req.user.id });
+    
+    if (!settings || !settings.github || !settings.github.validated) {
+      return res.status(400).json({
+        success: false,
+        error: 'GitHub is not configured. Please configure it in Settings.',
+      });
+    }
+
+    const { token, repositoryUrl } = settings.github;
+
+    console.log('[Assign Issues] Assigning', issueAssignments.length, 'issues');
+
+    const result = await githubAgent.assignIssues(token, repositoryUrl, issueAssignments);
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error assigning issues:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Create pull requests from test to main branch
+router.post('/create-pull-requests', authMiddleware, async (req, res) => {
+  try {
+    const { pullRequests } = req.body;
+
+    if (!pullRequests || pullRequests.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'pullRequests is required',
+      });
+    }
+
+    const settings = await Settings.findOne({ userId: req.user.id });
+    
+    if (!settings || !settings.github || !settings.github.validated) {
+      return res.status(400).json({
+        success: false,
+        error: 'GitHub is not configured. Please configure it in Settings.',
+      });
+    }
+
+    const { token, repositoryUrl } = settings.github;
+
+    console.log('[Create PRs] Creating', pullRequests.length, 'pull requests');
+
+    const result = await githubAgent.createPullRequest(token, repositoryUrl, pullRequests);
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error creating pull requests:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;

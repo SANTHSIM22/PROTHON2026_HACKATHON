@@ -31,16 +31,19 @@ Focus on:
 6. Security & Compliance: Security implications and compliance requirements
 7. Performance Considerations: Optimization opportunities
 8. GitHub Issues to Create: List specific, actionable GitHub issues with titles that should be created
+9. Pull Requests to Create: List specific pull requests that should be created based on the discussion
 
 Meeting Transcript:
 ${meetingData.transcript}
 
-Provide a structured technical analysis with specific recommendations. When suggesting GitHub issues, format them clearly as: "GitHub Issue: [Issue Title]"
+Provide a structured technical analysis with specific recommendations. 
+When suggesting GitHub issues, format them clearly as: "GitHub Issue: [Issue Title]"
+When suggesting Pull Requests requested in the transcript, format them strictly on a SINGLE LINE as:
+"Pull Request: [PR Title] | Description: [PR Description]"
 
 Example format:
 GitHub Issue: Implement Redis caching for transaction records
-GitHub Issue: Refactor billing module API endpoints
-GitHub Issue: Add security audit for payment gateway migration`;
+Pull Request: Merge Redis caching implementation | Description: Adds Redis caching for user transaction records to improve response time by 50%`;
 
       const analysis = await mistralClient.generateResponse(
         [{ role: 'user', content: technicalPrompt }],
