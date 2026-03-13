@@ -29,6 +29,9 @@ const Settings = () => {
   const [notionApiKey, setNotionApiKey] = useState('');
   const [notionDatabaseId, setNotionDatabaseId] = useState('');
   const [calendarToken, setCalendarToken] = useState('');
+  const [calendarClientId, setCalendarClientId] = useState('');
+  const [calendarClientSecret, setCalendarClientSecret] = useState('');
+  const [calendarRefreshToken, setCalendarRefreshToken] = useState('');
   const [calendarId, setCalendarId] = useState('primary');
 
   useEffect(() => { fetchSettings(); }, []);
@@ -60,6 +63,9 @@ const Settings = () => {
       if (settings.googleCalendar) {
         setCalendarId(settings.googleCalendar.calendarId || 'primary');
         if (settings.googleCalendar.accessToken === '••••••••') setCalendarToken('••••••••');
+        if (settings.googleCalendar.clientId === '••••••••') setCalendarClientId('••••••••');
+        if (settings.googleCalendar.clientSecret === '••••••••') setCalendarClientSecret('••••••••');
+        if (settings.googleCalendar.refreshToken === '••••••••') setCalendarRefreshToken('••••••••');
       }
       if (settings.trello) {
         setTrelloListId(settings.trello.listId || '');
@@ -146,8 +152,17 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put('http://localhost:5000/api/settings/google-calendar', { accessToken: calendarToken, calendarId: calendarId || 'primary' }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.put('http://localhost:5000/api/settings/google-calendar', { 
+        accessToken: calendarToken === '••••••••' ? undefined : calendarToken, 
+        clientId: calendarClientId === '••••••••' ? undefined : calendarClientId, 
+        clientSecret: calendarClientSecret === '••••••••' ? undefined : calendarClientSecret, 
+        refreshToken: calendarRefreshToken === '••••••••' ? undefined : calendarRefreshToken, 
+        calendarId: calendarId || 'primary' 
+      }, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.googleCalendar.accessToken === '••••••••') setCalendarToken('••••••••');
+      if (response.data.googleCalendar.clientId === '••••••••') setCalendarClientId('••••••••');
+      if (response.data.googleCalendar.clientSecret === '••••••••') setCalendarClientSecret('••••••••');
+      if (response.data.googleCalendar.refreshToken === '••••••••') setCalendarRefreshToken('••••••••');
       setSuccess('Google Calendar settings saved successfully');
     } catch (err) { setError(err.response?.data?.error || 'Failed to save Google Calendar settings'); } finally { setSaving(false); }
   };
@@ -376,17 +391,29 @@ const Settings = () => {
                   </div>
                 </div>
                 <div className="px-8 pb-8 pt-4 space-y-5">
-                  <InputField label="Access Token" hint="Your temporary Google OAuth token or service account token.">
-                    <input type="password" placeholder="ya29.a0A..." value={calendarToken} onChange={(e) => setCalendarToken(e.target.value)} className={inputClass}/>
-                    {calendarToken === '••••••••' && (
-                      <button onClick={() => setCalendarToken('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change token</button>
+                  <InputField label="Client ID" hint="Your Google Cloud OAuth Client ID.">
+                    <input type="text" placeholder="Enter Client ID" value={calendarClientId} onChange={(e) => setCalendarClientId(e.target.value)} disabled={calendarClientId === '••••••••'} className={inputClass}/>
+                    {calendarClientId === '••••••••' && (
+                      <button onClick={() => setCalendarClientId('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change Client ID</button>
+                    )}
+                  </InputField>
+                  <InputField label="Client Secret" hint="Your Google Cloud OAuth Client Secret.">
+                    <input type="password" placeholder="Enter Client Secret" value={calendarClientSecret} onChange={(e) => setCalendarClientSecret(e.target.value)} disabled={calendarClientSecret === '••••••••'} className={inputClass}/>
+                    {calendarClientSecret === '••••••••' && (
+                      <button onClick={() => setCalendarClientSecret('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change Client Secret</button>
+                    )}
+                  </InputField>
+                  <InputField label="Refresh Token" hint="The persistent Refresh Token from OAuth Playground.">
+                    <input type="password" placeholder="1//04bI..." value={calendarRefreshToken} onChange={(e) => setCalendarRefreshToken(e.target.value)} disabled={calendarRefreshToken === '••••••••'} className={inputClass}/>
+                    {calendarRefreshToken === '••••••••' && (
+                      <button onClick={() => setCalendarRefreshToken('')} className="text-[#D97706] text-xs font-medium mt-1 hover:underline">Change Refresh Token</button>
                     )}
                   </InputField>
                   <InputField label="Calendar ID" hint="Usually 'primary' for your default calendar.">
                     <input type="text" placeholder="primary" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} className={inputClass}/>
                   </InputField>
                   <div className="pt-2">
-                    <SaveButton onClick={handleSaveCalendar} disabled={!calendarToken}>Save Calendar Settings</SaveButton>
+                    <SaveButton onClick={handleSaveCalendar} disabled={!calendarClientId || !calendarClientSecret || !calendarRefreshToken}>Save Calendar Settings</SaveButton>
                   </div>
                 </div>
               </div>

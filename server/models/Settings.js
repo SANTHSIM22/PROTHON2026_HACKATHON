@@ -48,6 +48,18 @@ const settingsSchema = new mongoose.Schema({
       type: String,
       default: null,
     },
+    clientId: {
+      type: String,
+      default: null,
+    },
+    clientSecret: {
+      type: String,
+      default: null,
+    },
+    refreshToken: {
+      type: String,
+      default: null,
+    },
     calendarId: {
       type: String,
       default: 'primary',

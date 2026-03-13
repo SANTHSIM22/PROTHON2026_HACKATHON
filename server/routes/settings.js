@@ -28,8 +28,11 @@ router.get('/', authMiddleware, async (req, res) => {
         token: settings.github.token ? '••••••••' : null,
       },
     };
-    if (safeSettings.googleCalendar && safeSettings.googleCalendar.accessToken) {
-      safeSettings.googleCalendar.accessToken = '••••••••';
+    if (safeSettings.googleCalendar) {
+      if (safeSettings.googleCalendar.accessToken) safeSettings.googleCalendar.accessToken = '••••••••';
+      if (safeSettings.googleCalendar.clientId) safeSettings.googleCalendar.clientId = '••••••••';
+      if (safeSettings.googleCalendar.clientSecret) safeSettings.googleCalendar.clientSecret = '••••••••';
+      if (safeSettings.googleCalendar.refreshToken) safeSettings.googleCalendar.refreshToken = '••••••••';
     }
     
     if (safeSettings.trello) {
@@ -194,7 +197,7 @@ router.put('/contacts', authMiddleware, async (req, res) => {
  */
 router.put('/google-calendar', authMiddleware, async (req, res) => {
   try {
-    const { accessToken, calendarId } = req.body;
+    const { accessToken, clientId, clientSecret, refreshToken, calendarId } = req.body;
 
     let settings = await Settings.findOne({ userId: req.user.id });
 
@@ -209,6 +212,9 @@ router.put('/google-calendar', authMiddleware, async (req, res) => {
     }
 
     if (accessToken !== undefined) settings.googleCalendar.accessToken = accessToken;
+    if (clientId !== undefined) settings.googleCalendar.clientId = clientId;
+    if (clientSecret !== undefined) settings.googleCalendar.clientSecret = clientSecret;
+    if (refreshToken !== undefined) settings.googleCalendar.refreshToken = refreshToken;
     if (calendarId !== undefined) settings.googleCalendar.calendarId = calendarId || 'primary';
     
     await settings.save();
@@ -218,6 +224,9 @@ router.put('/google-calendar', authMiddleware, async (req, res) => {
       message: 'Google Calendar settings updated',
       googleCalendar: {
         accessToken: settings.googleCalendar.accessToken ? '••••••••' : null,
+        clientId: settings.googleCalendar.clientId ? '••••••••' : null,
+        clientSecret: settings.googleCalendar.clientSecret ? '••••••••' : null,
+        refreshToken: settings.googleCalendar.refreshToken ? '••••••••' : null,
         calendarId: settings.googleCalendar.calendarId
       },
     });

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 import { rootAgent, agentMemory, githubAgent, nonTechnicalAgent, emailAgent, calendarAgent, notionAgent } from '../agents/index.js';
 import trelloAgent from '../agents/trelloAgent.js';
 import authMiddleware from '../middleware/auth.js';
@@ -834,8 +835,24 @@ router.post('/create-calendar-events', authMiddleware, async (req, res) => {
     }
 
     const settings = await Settings.findOne({ userId: req.user.id });
-    const gCalToken = settings?.googleCalendar?.accessToken;
+    let gCalToken = settings?.googleCalendar?.accessToken;
     const calendarId = settings?.googleCalendar?.calendarId || 'primary';
+    
+    // Auto-refresh token if OAuth credentials are provided using googleapis SDK
+    if (settings?.googleCalendar?.refreshToken && settings?.googleCalendar?.clientId && settings?.googleCalendar?.clientSecret) {
+      try {
+        const oauth2Client = new google.auth.OAuth2(
+          settings.googleCalendar.clientId,
+          settings.googleCalendar.clientSecret,
+          "https://developers.google.com/oauthplayground"
+        );
+        oauth2Client.setCredentials({ refresh_token: settings.googleCalendar.refreshToken });
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        gCalToken = credentials.access_token;
+      } catch (err) {
+        console.error("Error fetching google refresh token:", err);
+      }
+    }
 
     // If no token is provided, fall back to a mock success (useful for tests)
     if (!gCalToken) {
