@@ -2,8 +2,8 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { rootAgent, agentMemory } from '../agents/index.js';
-import { githubAgent } from '../agents/index.js';
+import nodemailer from 'nodemailer';
+import { rootAgent, agentMemory, githubAgent, nonTechnicalAgent, emailAgent, calendarAgent } from '../agents/index.js';
 import authMiddleware from '../middleware/auth.js';
 import Meeting from '../models/Meeting.js';
 import Settings from '../models/Settings.js';
@@ -586,6 +586,128 @@ router.post('/extract-github-pull-requests', authMiddleware, async (req, res) =>
   }
 });
 
+// Extract Email Tasks from transcript
+router.post('/extract-emails', authMiddleware, async (req, res) => {
+  try {
+    const { dataIndex } = req.body;
+
+    if (dataIndex === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'dataIndex is required',
+      });
+    }
+
+    const dataPath = path.join(__dirname, '../data/data1.json');
+    const fileContent = fs.readFileSync(dataPath, 'utf-8');
+    const data = JSON.parse(fileContent);
+    const meetings = data.meetings;
+
+    if (!meetings || !meetings[dataIndex]) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid dataIndex',
+      });
+    }
+
+    const transcript = meetings[dataIndex].transcript;
+    const emails = await emailAgent.extractEmailTasks(transcript);
+
+    return res.json({
+      success: true,
+      emails: emails || [],
+      emailsFound: emails ? emails.length : 0,
+    });
+  } catch (error) {
+    console.error('Error extracting email tasks:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to send emails via Nodemailer
+router.post('/send-emails', authMiddleware, async (req, res) => {
+  try {
+    const { emailTasks } = req.body;
+
+    if (!emailTasks || emailTasks.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'emailTasks is required',
+      });
+    }
+
+    // Configure Nodemailer transporter
+    // For a hackathon demo, we will generate a test Ethereal account if no SMTP is provided.
+    // In production or to send *real* emails, add SMTP_USER and SMTP_PASS to your .env file
+    let transporter;
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      transporter = nodemailer.createTransport({
+        service: 'gmail', // or your email provider
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    } else {
+      console.log('No SMTP_USER found in .env, falling back to Ethereal Test Account...');
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false, 
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+    }
+
+    const results = [];
+    
+    for (const task of emailTasks) {
+      if (!task.emailAddress) continue;
+      
+      const mailOptions = {
+        from: '"AI Meeting Agent" <agent@ai-meetings.local>',
+        to: task.emailAddress,
+        subject: task.subject,
+        text: `Hello ${task.name},\n\nFollowing our recent meeting, here is a task assigned to you:\n\n${task.context}\n\nBest regards,\nAI Meeting Agent`,
+        html: `<h3>Hello ${task.name},</h3><p>Following our recent meeting, here is a task assigned to you:</p><blockquote style="border-left: 4px solid #ccc; padding-left: 10px; font-style: italic;">${task.context}</blockquote><br/><p>Best regards,<br/><strong>AI Meeting Agent</strong></p>`
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`Message sent to ${task.emailAddress}: %s`, info.messageId);
+      if (!process.env.SMTP_USER) {
+        console.log(`Preview URL for ${task.emailAddress}: %s`, nodemailer.getTestMessageUrl(info));
+      }
+      
+      results.push({
+        ...task,
+        success: true,
+        message: `Email sent successfully to ${task.emailAddress}`,
+        previewUrl: nodemailer.getTestMessageUrl(info) || null,
+        sentAt: new Date()
+      });
+    }
+
+    return res.json({
+      success: true,
+      successCount: results.length,
+      failureCount: 0,
+      results
+    });
+  } catch (error) {
+    console.error('Error sending emails:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // Assign GitHub issues to team members
 router.post('/assign-issues', authMiddleware, async (req, res) => {
   try {
@@ -663,6 +785,148 @@ router.post('/create-pull-requests', authMiddleware, async (req, res) => {
       success: false,
       error: error.message,
     });
+  }
+});
+
+// Extract Calendar Events from transcript
+router.post('/extract-events', authMiddleware, async (req, res) => {
+  try {
+    const { dataIndex } = req.body;
+
+    if (dataIndex === undefined) {
+      return res.status(400).json({ success: false, error: 'dataIndex is required' });
+    }
+
+    const dataPath = path.join(__dirname, '../data/data1.json');
+    const fileContent = fs.readFileSync(dataPath, 'utf-8');
+    const data = JSON.parse(fileContent);
+    const meetings = data.meetings;
+
+    if (!meetings || !meetings[dataIndex]) {
+      return res.status(400).json({ success: false, error: 'Invalid dataIndex' });
+    }
+
+    const transcript = meetings[dataIndex].transcript;
+    // We pass the "date" of the meeting as a reference so "next week" parses correctly
+    const meetingDate = meetings[dataIndex].date || new Date().toISOString();
+    
+    const events = await calendarAgent.extractEvents(transcript, meetingDate);
+
+    return res.json({
+      success: true,
+      events: events || [],
+      eventsFound: events ? events.length : 0,
+    });
+  } catch (error) {
+    console.error('Error extracting calendar events:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create Calendar events
+router.post('/create-calendar-events', authMiddleware, async (req, res) => {
+  try {
+    const { events } = req.body;
+
+    if (!events || events.length === 0) {
+      return res.status(400).json({ success: false, error: 'No events provided' });
+    }
+
+    const settings = await Settings.findOne({ userId: req.user.id });
+    const gCalToken = settings?.googleCalendar?.accessToken;
+    const calendarId = settings?.googleCalendar?.calendarId || 'primary';
+
+    // If no token is provided, fall back to a mock success (useful for tests)
+    if (!gCalToken) {
+      const results = events.map(event => ({
+        ...event,
+        success: true,
+        message: `(Mock) Event '${event.summary}' scheduled for ${event.date}`,
+        status: 'scheduled'
+      }));
+
+      return res.json({
+        success: true,
+        successCount: results.length,
+        failureCount: 0,
+        results,
+        note: 'Mocked locally. Add Google Calendar Token in Settings to sync to a real calendar.'
+      });
+    }
+
+    // Push data to the REAL Google Calendar API
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const event of events) {
+      // Build request body for Google API
+      const requestBody = {
+        summary: event.summary,
+        description: event.description,
+      };
+
+      if (event.isAllDay) {
+        requestBody.start = { date: event.date };
+        requestBody.end = { date: event.date };
+        // Google requires endDate to be the next day (exclusive) for all day events
+        const nextDay = new Date(event.date);
+        nextDay.setDate(nextDay.getDate() + 1);
+        requestBody.end = { date: nextDay.toISOString().split('T')[0] };
+      } else {
+        // Assume default timezone processing or construct standard ISO strings
+        const startDateTime = event.startTime 
+            ? `${event.date}T${event.startTime}:00Z` 
+            : `${event.date}T09:00:00Z`; // fallback to 9am UTC
+            
+        // Provide standard 1 hr end block
+        const endDate = new Date(startDateTime);
+        endDate.setMinutes(endDate.getMinutes() + (event.durationMinutes || 60));
+
+        requestBody.start = { dateTime: startDateTime };
+        requestBody.end = { dateTime: endDate.toISOString() };
+      }
+
+      // Add attendees if any
+      if (event.attendees && event.attendees.length > 0) {
+        // Here we attempt to map their names, you could even map against contacts list!
+        requestBody.attendees = event.attendees.map(a => ({ email: typeof a === 'string' && a.includes('@') ? a : 'dummy@example.com' }));
+      }
+
+      // Execute fetch
+      try {
+        const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${gCalToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error?.message || 'Google API Error');
+        }
+
+        successCount++;
+        results.push({ ...event, success: true, apiLink: data.htmlLink });
+      } catch (err) {
+        failureCount++;
+        results.push({ ...event, success: false, error: err.message });
+      }
+    }
+
+    return res.json({
+      success: true,
+      successCount,
+      failureCount,
+      results
+    });
+  } catch (error) {
+    console.error('Error creating calendar events:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

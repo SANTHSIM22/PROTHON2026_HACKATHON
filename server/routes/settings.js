@@ -28,6 +28,9 @@ router.get('/', authMiddleware, async (req, res) => {
         token: settings.github.token ? '••••••••' : null,
       },
     };
+    if (safeSettings.googleCalendar && safeSettings.googleCalendar.accessToken) {
+      safeSettings.googleCalendar.accessToken = '••••••••';
+    }
 
     res.json({
       success: true,
@@ -138,6 +141,79 @@ router.put('/preferences', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Update preferences error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Update contacts (for email routing)
+ */
+router.put('/contacts', authMiddleware, async (req, res) => {
+  try {
+    const { contacts } = req.body;
+
+    let settings = await Settings.findOne({ userId: req.user.id });
+
+    if (!settings) {
+      settings = new Settings({
+        userId: req.user.id,
+      });
+    }
+
+    settings.contacts = contacts || [];
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Contacts updated',
+      contacts: settings.contacts,
+    });
+  } catch (error) {
+    console.error('Update contacts error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Update Google Calendar settings
+ */
+router.put('/google-calendar', authMiddleware, async (req, res) => {
+  try {
+    const { accessToken, calendarId } = req.body;
+
+    let settings = await Settings.findOne({ userId: req.user.id });
+
+    if (!settings) {
+      settings = new Settings({
+        userId: req.user.id,
+      });
+    }
+
+    if (!settings.googleCalendar) {
+      settings.googleCalendar = {};
+    }
+
+    if (accessToken !== undefined) settings.googleCalendar.accessToken = accessToken;
+    if (calendarId !== undefined) settings.googleCalendar.calendarId = calendarId || 'primary';
+    
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Google Calendar settings updated',
+      googleCalendar: {
+        accessToken: settings.googleCalendar.accessToken ? '••••••••' : null,
+        calendarId: settings.googleCalendar.calendarId
+      },
+    });
+  } catch (error) {
+    console.error('Update Google Calendar settings error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
