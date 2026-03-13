@@ -58,6 +58,10 @@ const settingsSchema = new mongoose.Schema({
     apiToken: { type: String, default: null },
     listId: { type: String, default: null },
   },
+  notion: {
+    apiKey: { type: String, default: null },
+    databaseId: { type: String, default: null },
+  },
   preferences: {
     autoCreateGitHubIssues: {
       type: Boolean,

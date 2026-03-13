@@ -37,6 +37,10 @@ router.get('/', authMiddleware, async (req, res) => {
       if (safeSettings.trello.apiToken) safeSettings.trello.apiToken = '••••••••';
     }
 
+    if (safeSettings.notion) {
+      if (safeSettings.notion.apiKey) safeSettings.notion.apiKey = '••••••••';
+    }
+
     res.json({
       success: true,
       settings: safeSettings,
@@ -257,6 +261,41 @@ router.put('/trello', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Update Trello settings error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Update Notion settings
+ */
+router.put('/notion', authMiddleware, async (req, res) => {
+  try {
+    const { apiKey, databaseId } = req.body;
+
+    let settings = await Settings.findOne({ userId: req.user.id });
+
+    if (!settings) {
+      settings = new Settings({ userId: req.user.id });
+    }
+
+    if (!settings.notion) {
+      settings.notion = {};
+    }
+
+    if (apiKey !== undefined) settings.notion.apiKey = apiKey;
+    if (databaseId !== undefined) settings.notion.databaseId = databaseId;
+
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Notion settings updated',
+    });
+  } catch (error) {
+    console.error('Update Notion settings error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
