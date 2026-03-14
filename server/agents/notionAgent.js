@@ -3,9 +3,23 @@ import { agentConfig } from './config.js';
 
 class NotionAgent {
   async generateSummary(transcript) {
-    const prompt = `Analyze the following meeting transcript. Generate a comprehensive and well-structured summary of the meeting. 
-Include the main topics discussed, key decisions made, and a brief overview of action items.
-Return the output as plain text formatted with Markdown (headings, bullet points). Do not include any conversational filler.
+    const prompt = `Analyze this meeting transcript and produce a concise, user-friendly Markdown brief that is easy to scan.
+
+Use this structure:
+1. # Meeting Brief
+2. ## Snapshot (2-4 bullets in plain language)
+3. ## Decisions Made (bullet list)
+4. ## Action Checklist (Markdown checkboxes using - [ ] ...)
+5. ## Technical Issues (ONLY include when real technical issues exist)
+6. ## Non-Technical Issues (ONLY include when real business/process issues exist)
+7. ## Next Steps (short numbered list)
+
+Formatting rules:
+- Keep language simple and direct.
+- Do not add sections that have no content.
+- Do not write placeholders like "None", "N/A", or "No issues".
+- Keep each bullet to one clear point.
+- Return Markdown only, with no conversational filler.
 
 Transcript:
 ${transcript}`;

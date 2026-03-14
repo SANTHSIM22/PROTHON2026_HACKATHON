@@ -2,17 +2,18 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { BentoDemo } from './ui/bento-demo';
+import actifyLogo from '../assets/actify-logo.svg';
 
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const testimonials = [
-    { text: "MeetingAI saved our team 15 hours a week in manual documentation.", author: "Sarah J.", role: "Product Manager" },
+    { text: "ACTIFY saved our team 15 hours a week in manual documentation.", author: "Sarah J.", role: "Product Manager" },
     { text: "The accuracy of the action items is mind-blowing. It's like having another engineer in the room.", author: "David C.", role: "Tech Lead" },
     { text: "We finally have visibility into decisions made across all our remote synchronous meetings.", author: "Elena R.", role: "Director of Ops" },
     { text: "The Trello integration means nothing falls through the cracks anymore.", author: "Mark T.", role: "Scrum Master" },
-    { text: "MeetingAI extracted insights I didn't even realize we discussed.", author: "Chloe S.", role: "Marketing Head" },
+    { text: "ACTIFY extracted insights I didn't even realize we discussed.", author: "Chloe S.", role: "Marketing Head" },
     { text: "It's completely replaced our need for a dedicated project coordinator.", author: "Alex B.", role: "Startup Founder" }
   ];
 
@@ -38,14 +39,8 @@ const Home = () => {
       <nav className="relative z-50 border-b border-[#D4E0DA] bg-[#F0F4F2]/80 backdrop-blur-2xl backdrop-saturate-150 sticky top-0">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2.5 cursor-pointer group" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 relative flex items-center justify-center text-[#B45309] group-hover:rotate-[15deg] group-hover:scale-110 transition-all duration-500 ease-out">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="9" y1="9" x2="15" y2="15"></line>
-                <line x1="15" y1="9" x2="9" y2="15"></line>
-              </svg>
-            </div>
-            <span className="text-xl font-bold tracking-[0.2em] text-[#0C1A15] mt-0.5 group-hover:text-[#B45309] transition-all duration-500">MEETING.AI</span>
+            <img src={actifyLogo} alt="ACTIFY logo" className="w-8 h-8 rounded-lg group-hover:scale-110 transition-all duration-500 ease-out" />
+            <span className="text-xl tracking-[0.18em] text-[#0C1A15] mt-0.5 group-hover:text-[#B45309] transition-all duration-500" style={{ fontFamily: 'var(--font-brand)' }}>ACTIFY</span>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -105,7 +100,7 @@ const Home = () => {
 
             {/* Paragraph */}
             <p className="text-[#3D5249] text-lg lg:text-xl max-w-lg leading-[1.7] font-light">
-              MeetingAI deploys an autonomous multi-agent AI that thinks like a Product Manager — transcribing, analyzing, and assigning action items without human guidance.
+              ACTIFY deploys an autonomous multi-agent AI that thinks like a Product Manager — transcribing, analyzing, and assigning action items without human guidance.
             </p>
 
             {/* Actions */}
@@ -154,7 +149,7 @@ const Home = () => {
               <div className="flex justify-between items-start mb-8 pt-2">
                 <div>
                   <div className="text-[10px] text-[#7A9489] font-bold tracking-[0.2em] uppercase mb-1.5">
-                    MEETINGAI AGENT
+                    ACTIFY AGENT
                   </div>
                   <div className="text-lg font-semibold text-[#0C1A15]">Live Analysis Pipeline</div>
                 </div>
@@ -406,15 +401,11 @@ const Home = () => {
       <div className="relative z-10 border-t border-[#D4E0DA]">
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2 text-[#7A9489]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-            </svg>
-            <span className="text-xs font-medium tracking-widest uppercase">Meeting.AI</span>
+            <img src={actifyLogo} alt="ACTIFY logo" className="w-4 h-4 rounded" />
+            <span className="text-xs tracking-wider uppercase" style={{ fontFamily: 'var(--font-brand)' }}>ACTIFY</span>
           </div>
           <div className="text-[11px] text-[#8FA89F] font-medium">
-            © {new Date().getFullYear()} MeetingAI. All rights reserved.
+            © {new Date().getFullYear()} ACTIFY. All rights reserved.
           </div>
         </div>
       </div>
