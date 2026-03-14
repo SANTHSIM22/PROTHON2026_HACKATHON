@@ -77,7 +77,10 @@ Analyze the following meeting transcript. Extract:
 Transcript:
 ${transcript}
 
-Provide a structured analysis.`;
+IMPORTANT INSTRUCTIONS:
+- If the transcript is extremely short, casual, or contains absolutely NO substantial discussion (e.g., just a microphone check or basic greetings), DO NOT generate filler content. Simply output: "No substantial points or action items were identified in this meeting."
+- Do not list out empty categories.
+- Only provide a structured analysis if real content exists.`;
 
       const response = await this.generateResponse(
         [{ role: 'user', content: prompt }],
@@ -103,7 +106,9 @@ Extract all action items from the meeting transcript. For each action item, iden
 - Priority (High/Medium/Low)
 - Due date (if mentioned)
 
-Return as structured JSON.
+IMPORTANT: If there are no action items discussed, or if the transcript is purely conversational/introductory, simply return this exact JSON indicating empty actions: []
+
+Return as a structured JSON array directly without markdown outside of the array.
 
 Transcript:
 ${transcript}`;

@@ -36,14 +36,13 @@ Focus on:
 Meeting Transcript:
 ${meetingData.transcript}
 
-Provide a structured technical analysis with specific recommendations. 
-When suggesting GitHub issues, format them clearly as: "GitHub Issue: [Issue Title]"
-When suggesting Pull Requests requested in the transcript, format them strictly on a SINGLE LINE as:
-"Pull Request: [PR Title] | Description: [PR Description]"
-
-Example format:
-GitHub Issue: Implement Redis caching for transaction records
-Pull Request: Merge Redis caching implementation | Description: Adds Redis caching for user transaction records to improve response time by 50%`;
+IMPORTANT INSTRUCTIONS:
+- If the transcript is extremely short, casual, or contains absolutely NO technical discussions (e.g., just a microphone check or greetings), DO NOT generate filler content. Simply output: "No technical discussion points were found in this meeting."
+- Do not list out empty categories (e.g., avoid "1. Technical Requirements: None").
+- Only provide structured technical analysis and recommendations if real technical content exists.
+- When suggesting GitHub issues based on actual content, format them clearly as: "GitHub Issue: [Issue Title]"
+- When suggesting Pull Requests based on actual content, format them strictly on a SINGLE LINE as:
+"Pull Request: [PR Title] | Description: [PR Description]"`;
 
       const analysis = await mistralClient.generateResponse(
         [{ role: 'user', content: technicalPrompt }],
@@ -98,6 +97,8 @@ Pull Request: Merge Redis caching implementation | Description: Adds Redis cachi
     try {
       const actionPrompt = `From this meeting transcript, extract ONLY technical action items with clear ownership:
 ${meetingData.transcript}
+
+IMPORTANT: If there are no technical action items discussed, or if the transcript is purely conversational/introductory, simply return this exact JSON indicating empty actions: { "actions": [] }
 
 Format as JSON with structure:
 {

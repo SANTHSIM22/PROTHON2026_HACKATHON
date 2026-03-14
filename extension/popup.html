@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>Prothon Extension</title>
+</head>
+<body>
+  <div id="login-container">
+    <h2>Login</h2>
+    <div id="error-message" class="error"></div>
+    <form id="login-form">
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="password" id="password" placeholder="Password" required />
+      <button type="submit">Log in</button>
+    </form>
+    <p class="subtext">Use your existing platform credentials.</p>
+  </div>
+
+  <div id="user-container" class="hidden">
+    <div class="user-info">
+      <h2 id="greeting">Welcome, <span id="user-name"></span>!</h2>
+      <p class="role-badge">Role: <strong id="user-role"></strong></p>
+    </div>
+    <div class="actions">
+      <div id="recording-visualizer" class="hidden">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+      <div id="recording-status" class="status-indicator">Ready indicator</div>
+      <button id="record-btn" class="primary">Start Recording</button>
+      <button id="logout-btn" class="secondary">Log out</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

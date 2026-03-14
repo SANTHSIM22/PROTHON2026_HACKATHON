@@ -1,0 +1,144 @@
+body {
+  width: 320px;
+  margin: 0;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #333;
+  background-color: #f9fbfc;
+}
+
+h2 {
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #111;
+}
+
+.hidden {
+  display: none !important;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #1d4ed8;
+}
+
+button.secondary {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+button.secondary:hover {
+  background-color: #d1d5db;
+}
+
+button:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 12px;
+  background-color: #fee2e2;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.error:empty {
+  display: none;
+}
+
+.subtext {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 15px;
+}
+
+.user-info {
+  margin-bottom: 20px;
+}
+
+.role-badge {
+  font-size: 14px;
+  color: #4b5563;
+  background-color: #f3f4f6;
+  padding: 6px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 5px;
+}
+
+.role-badge strong {
+  text-transform: capitalize;
+}
+
+.status-indicator {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-align: center;
+  padding: 5px;
+}
+
+#recording-visualizer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30px;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+#recording-visualizer.hidden {
+  display: none !important;
+}
+
+.bar {
+  width: 6px;
+  height: 10px;
+  background-color: #dc2626;
+  border-radius: 3px;
+  animation: equalize 1s infinite alternate;
+}
+
+.bar:nth-child(1) { animation-delay: 0.1s; }
+.bar:nth-child(2) { animation-delay: 0.3s; }
+.bar:nth-child(3) { animation-delay: 0.0s; }
+.bar:nth-child(4) { animation-delay: 0.4s; }
+.bar:nth-child(5) { animation-delay: 0.2s; }
+
+@keyframes equalize {
+  0% { height: 10px; }
+  100% { height: 30px; }
+}

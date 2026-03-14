@@ -6,6 +6,7 @@ import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import MeetingDetails from './components/MeetingDetails';
+import Recordings from './components/Recordings';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -33,8 +34,14 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/meeting/:id"
+          <Route            path="/recordings"
+            element={
+              <ProtectedRoute>
+                <Recordings />
+              </ProtectedRoute>
+            }
+          />
+          <Route            path="/meeting/:id"
             element={
               <ProtectedRoute>
                 <MeetingDetails />

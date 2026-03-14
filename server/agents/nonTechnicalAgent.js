@@ -34,7 +34,10 @@ Focus on:
 Meeting Transcript:
 ${meetingData.transcript}
 
-Provide a structured business analysis with clear insights.`;
+IMPORTANT INSTRUCTIONS:
+- If the transcript is extremely short, casual, or contains absolutely NO business/management discussions (e.g., just a microphone check or greetings), DO NOT generate filler content. Simply output: "No business decisions or topics were discussed in this meeting."
+- Do not list out empty categories (e.g., avoid "1. Business Objectives: None").
+- Only provide a structured business analysis if real business content exists.`;
 
       const analysis = await mistralClient.generateResponse(
         [{ role: 'user', content: businessPrompt }],
@@ -89,6 +92,8 @@ Provide a structured business analysis with clear insights.`;
     try {
       const actionPrompt = `From this meeting transcript, extract ONLY business/management action items and decisions:
 ${meetingData.transcript}
+
+IMPORTANT: If there are no business action items or decisions discussed, or if the transcript is purely conversational/introductory, simply return empty arrays: { "decisions": [], "actions": [] }
 
 Format as JSON with structure:
 {
