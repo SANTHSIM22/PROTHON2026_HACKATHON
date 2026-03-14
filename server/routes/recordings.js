@@ -410,10 +410,34 @@ router.post('/organization/meetings/:meetingName/export', authMiddleware, async 
       transcript: transcriptString
     };
 
+    // Save to data1.json file
+    const dataPath = path.join(__dirname, '../data/data1.json');
+    let dbData = { meetings: [] };
+    if (fs.existsSync(dataPath)) {
+      const rawData = fs.readFileSync(dataPath, 'utf8');
+      try {
+        dbData = JSON.parse(rawData);
+        if (!dbData.meetings) dbData.meetings = [];
+      } catch(e) {
+        dbData = { meetings: [] };
+      }
+    }
+
+    // Check if meeting already exists in file
+    const existingIndex = dbData.meetings.findIndex(m => m.title === meetingName);
+    if (existingIndex !== -1) {
+      // Update existing meeting
+      dbData.meetings[existingIndex] = newStructuredMeeting;
+    } else {
+      // Add new meeting
+      dbData.meetings.push(newStructuredMeeting);
+    }
+    fs.writeFileSync(dataPath, JSON.stringify(dbData, null, 2), 'utf8');
+
     // Store in Database based on organization
     const orgId = req.user.id;
     let orgData = await OrganizationData.findOne({ organizationId: orgId });
-    
+
     if (!orgData) {
       orgData = new OrganizationData({ organizationId: orgId, meetings: [] });
     }
@@ -430,10 +454,10 @@ router.post('/organization/meetings/:meetingName/export', authMiddleware, async 
       // Insert new meeting index array
       orgData.meetings.push(newStructuredMeeting);
     }
-    
+
     await orgData.save();
 
-    res.json({ message: 'Successfully exported structured data to MongoDB!', meeting: newStructuredMeeting });
+    res.json({ message: 'Successfully exported formatted transcript and saved to MongoDB and data1.json!', meeting: newStructuredMeeting });
   } catch (err) {
     console.error('Export Data Error:', err);
     res.status(500).json({ error: 'Failed to export structured data.' });

@@ -175,7 +175,7 @@ const Recordings = () => {
       await axios.post(`${API_URL}/recordings/organization/meetings/${selectedMeeting}/export`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Successfully exported formatted transcript and saved to MongoDB!');
+      alert('Successfully exported formatted transcript and saved to MongoDB and data1.json!');
     } catch (error) {
       console.error('Export error:', error);
       alert('Failed to export structured data.');
