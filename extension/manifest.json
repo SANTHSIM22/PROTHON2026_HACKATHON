@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Prothon Hackathon Extension",
+  "name": "Actify",
   "version": "1.0",
   "description": "Chrome extension for technical and non-technical users",
   "icons": {
-    "16": "hero.png",
-    "48": "hero.png",
-    "128": "hero.png"
+    "16": "actify-logo.png",
+    "48": "actify-logo.png",
+    "128": "actify-logo.png"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "hero.png"
+    "default_icon": "actify-logo.png"
   },
   "background": {
     "service_worker": "background.js"

@@ -7,38 +7,84 @@
 </head>
 <body>
 
-  <!-- LOGIN -->
+  <!-- ── LOGIN ── -->
   <div id="login-container">
-    <div class="logo">Actify</div>
+    <div class="login-header">
+      <img src="actify-logo.png" class="logo-img" alt="Actify" />
+      <h1 class="brand">actify</h1>
+      <p class="tagline">Meeting intelligence, captured.</p>
+    </div>
+
     <div id="error-message" class="error"></div>
+
     <form id="login-form">
-      <input type="email" id="email" placeholder="Email" required />
-      <input type="password" id="password" placeholder="Password" required />
-      <button type="submit">Log in</button>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@company.com" required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required />
+      </div>
+      <button type="submit" id="login-btn">
+        <span class="btn-label">Log in</span>
+      </button>
     </form>
+
     <p class="subtext">Use your existing platform credentials.</p>
   </div>
 
-  <!-- USER -->
+  <!-- ── USER ── -->
   <div id="user-container" class="hidden">
-    <div class="top-bar">
-      <div class="user-info">
-        <span id="user-name" class="name"></span>
-        <span id="user-role" class="badge"></span>
+
+    <!-- Profile strip -->
+    <div class="profile-strip">
+      <div class="avatar" id="avatar">A</div>
+      <div class="profile-info">
+        <span class="profile-name" id="user-name">User</span>
+        <span class="badge" id="user-role">Member</span>
       </div>
-      <button id="logout-btn" class="logout">Log out</button>
+      <button id="logout-btn" class="icon-btn" title="Log out">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
     </div>
 
-    <div class="divider"></div>
+    <div class="sep"></div>
 
-    <div class="record-section">
-      <div id="recording-visualizer" class="waveform hidden">
-        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        <div class="bar"></div><div class="bar"></div>
+    <!-- Record area -->
+    <div class="record-area">
+
+      <!-- Idle state -->
+      <div id="idle-state" class="state-block">
+        <div class="meet-check" id="meet-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        </div>
+        <p id="recording-status" class="status-text">Ready to record</p>
       </div>
-      <p id="recording-status" class="status">Ready indicator</p>
-      <button id="record-btn">Start Recording</button>
+
+      <!-- Recording state -->
+      <div id="recording-state" class="state-block hidden">
+        <div class="pulse-ring">
+          <div class="pulse-dot"></div>
+        </div>
+        <div id="recording-visualizer" class="waveform">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+        <p class="rec-label">Recording in progress</p>
+      </div>
+
+      <button id="record-btn" class="record-btn">Start Recording</button>
     </div>
+
   </div>
 
   <script src="popup.js"></script>
