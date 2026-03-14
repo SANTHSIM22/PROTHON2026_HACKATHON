@@ -439,10 +439,18 @@ router.get('/processed-data/:conversationId', authMiddleware, async (req, res) =
 router.get('/available-data', authMiddleware, async (req, res) => {
   try {
     const dataPath = path.join(__dirname, '../data/data1.json');
+    console.log('Reading from:', dataPath);
+    
+    if (!fs.existsSync(dataPath)) {
+      console.error('File not found:', dataPath);
+      return res.json({ success: true, count: 0, meetings: [] });
+    }
+    
     const fileContent = fs.readFileSync(dataPath, 'utf-8');
     const data = JSON.parse(fileContent);
-    const meetings = data.meetings;
+    const meetings = data.meetings || [];
 
+    console.log('Available meetings:', meetings.length);
     res.json({
       success: true,
       count: meetings.length,
@@ -451,10 +459,11 @@ router.get('/available-data', authMiddleware, async (req, res) => {
         id: m.id,
         title: m.title,
         date: m.date,
-        attendees: m.attendees.length,
+        attendees: Array.isArray(m.attendees) ? m.attendees.length : 0,
       })),
     });
   } catch (error) {
+    console.error('Error in available-data endpoint:', error);
     res.status(500).json({
       success: false,
       error: error.message,

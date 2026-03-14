@@ -390,11 +390,14 @@ const Dashboard = () => {
   const [viewMode, setViewMode] = useState('formatted');
 
   useEffect(() => {
-    fetchAvailableData();
-    fetchGitHubSettings();
-    if (user?.role === 'non-technical') setActiveTab('nonTechnical');
-    else setActiveTab('technical');
-  }, [user?.role]);
+    if (user) {
+      console.log('User loaded, fetching data:', user);
+      fetchAvailableData();
+      fetchGitHubSettings();
+      if (user?.role === 'non-technical') setActiveTab('nonTechnical');
+      else setActiveTab('technical');
+    }
+  }, [user]);
 
   useEffect(() => {
     if (processingData && !showIssueConfirmation && !showPRConfirmation && !showEmailConfirmation && !showEventConfirmation && !showTrelloConfirmation && !showNotionConfirmation) {
@@ -406,10 +409,15 @@ const Dashboard = () => {
   const fetchAvailableData = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('Fetching available data with token:', token ? 'present' : 'missing');
       const response = await axios.get(`${API_URL}/agents/available-data`, { headers: { Authorization: `Bearer ${token}` } });
+      console.log('Available data response:', response.data);
       setAvailableData(response.data.meetings || []);
       setError('');
-    } catch { setError('Failed to load available data'); }
+    } catch (error) {
+      console.error('Failed to load available data:', error);
+      setError('Failed to load available data: ' + (error.response?.data?.error || error.message));
+    }
   };
 
   const fetchGitHubSettings = async () => {
@@ -766,9 +774,14 @@ const Dashboard = () => {
               <p className="text-[#8FA89F] text-[10px] uppercase tracking-widest font-semibold mb-0.5">Role</p>
               <p className="text-[#0C1A15] font-semibold text-sm capitalize" style={{ fontFamily: 'var(--font-sans)' }}>{user?.role || 'member'}</p>
             </div>
-            <div className="px-4 py-2.5 rounded-xl bg-[#F7FAF8] border border-[#D4E0DA]/60">
-              <p className="text-[#8FA89F] text-[10px] uppercase tracking-widest font-semibold mb-0.5">Meetings</p>
-              <p className="text-[#0C1A15] font-semibold text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{availableData.length}</p>
+            <div className="px-4 py-2.5 rounded-xl bg-[#F7FAF8] border border-[#D4E0DA]/60 flex items-center justify-between">
+              <div>
+                <p className="text-[#8FA89F] text-[10px] uppercase tracking-widest font-semibold mb-0.5">Meetings</p>
+                <p className="text-[#0C1A15] font-semibold text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{availableData.length}</p>
+              </div>
+              <button onClick={fetchAvailableData} className="ml-2 p-1 hover:bg-[#D4E0DA]/40 rounded text-[#8FA89F] hover:text-[#3D5249]" title="Refresh meetings list">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36"/></svg>
+              </button>
             </div>
           </div>
           <div className="ml-auto text-right">
