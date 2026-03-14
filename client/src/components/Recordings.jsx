@@ -184,7 +184,7 @@ const Recordings = () => {
       await axios.post(`${API_URL}/recordings/organization/meetings/${selectedMeeting}/export`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Successfully exported formatted transcript to data1.json!');
+      alert('Successfully exported formatted transcript and saved to MongoDB!');
     } catch (error) {
       console.error('Export error:', error);
       alert('Failed to export structured data.');
@@ -251,7 +251,7 @@ const Recordings = () => {
                   disabled={!selectedMeeting || isExporting}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium transition-colors mr-2"
                 >
-                  {isExporting ? 'Exporting...' : 'Export to data1.json'}
+                    {isExporting ? 'Exporting...' : 'Export to DB'}
                 </button>
                 <label className="text-sm font-medium text-[#4B5563]">Select Meeting:</label>
                 <select 

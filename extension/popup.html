@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="popup.css">
-  <title>Prothon Extension</title>
+  <title>Actify</title>
 </head>
 <body>
+
+  <!-- LOGIN -->
   <div id="login-container">
-    <h2>Login</h2>
+    <div class="logo">Actify</div>
     <div id="error-message" class="error"></div>
     <form id="login-form">
       <input type="email" id="email" placeholder="Email" required />
@@ -17,22 +19,25 @@
     <p class="subtext">Use your existing platform credentials.</p>
   </div>
 
+  <!-- USER -->
   <div id="user-container" class="hidden">
-    <div class="user-info">
-      <h2 id="greeting">Welcome, <span id="user-name"></span>!</h2>
-      <p class="role-badge">Role: <strong id="user-role"></strong></p>
-    </div>
-    <div class="actions">
-      <div id="recording-visualizer" class="hidden">
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
+    <div class="top-bar">
+      <div class="user-info">
+        <span id="user-name" class="name"></span>
+        <span id="user-role" class="badge"></span>
       </div>
-      <div id="recording-status" class="status-indicator">Ready indicator</div>
-      <button id="record-btn" class="primary">Start Recording</button>
-      <button id="logout-btn" class="secondary">Log out</button>
+      <button id="logout-btn" class="logout">Log out</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="record-section">
+      <div id="recording-visualizer" class="waveform hidden">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div>
+      </div>
+      <p id="recording-status" class="status">Ready indicator</p>
+      <button id="record-btn">Start Recording</button>
     </div>
   </div>
 
