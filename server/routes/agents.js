@@ -264,6 +264,34 @@ router.post('/process-data', authMiddleware, async (req, res) => {
     const meetingData = meetings[dataIndex];
     const conversationId = `conv_data_${meetingData.id}`;
 
+    const parsedConversation = [];
+    if (meetingData.transcript) {
+      const transcriptText = meetingData.transcript;
+      const parts = transcriptText.split(/(?:^|\n|\s)(?:(?:\d{2}:\d{2}:\d{2}\s*)?)([A-Za-z0-9 _-]+):\s/g);
+      
+      for (let i = 1; i < parts.length; i += 2) {
+        const speakerName = parts[i].trim();
+        const speech = (parts[i+1] || "").trim();
+        
+        if (speech) {
+          parsedConversation.push({
+            speaker: speakerName,
+            text: speech
+          });
+        }
+      }
+    }
+
+    const structuredMeetingData = {
+      meeting: {
+        id: meetingData.id || `meeting_${Date.now()}`,
+        title: meetingData.title || `Meeting ${new Date().toISOString().split('T')[0]}`,
+        date: meetingData.date || new Date().toISOString().split('T')[0],
+        hosted_by: meetingData.attendees && meetingData.attendees.length > 0 ? (meetingData.attendees[0].split(' ')[0] || meetingData.attendees[0]) : "Unknown"
+      },
+      conversation: parsedConversation
+    };
+
     // Process with both technical and non-technical agents
     const result = await rootAgent.processDualPerspective(
       req.user.id,
@@ -273,6 +301,7 @@ router.post('/process-data', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
+      structuredData: structuredMeetingData,
       ...result,
     });
   } catch (error) {
@@ -301,9 +330,38 @@ router.post('/process-data-mock', authMiddleware, async (req, res) => {
     const meetingData = meetings[dataIndex];
     const conversationId = `conv_data_${meetingData.id}`;
 
+    const parsedConversation = [];
+    if (meetingData.transcript) {
+      const transcriptText = meetingData.transcript;
+      const parts = transcriptText.split(/(?:^|\n|\s)(?:(?:\d{2}:\d{2}:\d{2}\s*)?)([A-Za-z0-9 _-]+):\s/g);
+      
+      for (let i = 1; i < parts.length; i += 2) {
+        const speakerName = parts[i].trim();
+        const speech = (parts[i+1] || "").trim();
+        
+        if (speech) {
+          parsedConversation.push({
+            speaker: speakerName,
+            text: speech
+          });
+        }
+      }
+    }
+
+    const structuredMeetingData = {
+      meeting: {
+        id: meetingData.id || `meeting_${Date.now()}`,
+        title: meetingData.title || `Meeting ${new Date().toISOString().split('T')[0]}`,
+        date: meetingData.date || new Date().toISOString().split('T')[0],
+        hosted_by: meetingData.attendees && meetingData.attendees.length > 0 ? (meetingData.attendees[0].split(' ')[0] || meetingData.attendees[0]) : "Unknown"
+      },
+      conversation: parsedConversation
+    };
+
     // Return mock analysis with GitHub issues
     const mockAnalysis = {
       success: true,
+      structuredData: structuredMeetingData,
       meetingId: meetingData.id,
       title: meetingData.title,
       timestamp: new Date().toISOString(),
@@ -1169,3 +1227,4 @@ router.post('/create-notion-page', authMiddleware, async (req, res) => {
 });
 
 export default router;
+
