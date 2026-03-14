@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import actifyLogo from '../assets/actify-logo.svg';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -65,14 +66,8 @@ const Login = () => {
         {/* Logo */}
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-3 group w-fit">
-            <div className="w-10 h-10 flex items-center justify-center text-[#B45309] group-hover:rotate-[15deg] group-hover:scale-110 transition-all duration-500">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold tracking-[0.25em] text-white">MEETING.AI</span>
+            <img src={actifyLogo} alt="ACTIFY logo" className="w-10 h-10 rounded-lg group-hover:scale-110 transition-all duration-500" />
+            <span className="text-xl tracking-[0.2em] text-white" style={{ fontFamily: 'var(--font-brand)' }}>ACTIFY</span>
           </Link>
         </div>
 
@@ -107,7 +102,7 @@ const Login = () => {
         {/* Legal / Bottom */}
         <div className="relative z-10">
           <p className="text-[#556961] text-xs font-mono">
-            &copy; {new Date().getFullYear()} MeetingAI Pipeline. All rights reserved.
+            &copy; {new Date().getFullYear()} ACTIFY Pipeline. All rights reserved.
           </p>
         </div>
       </div>
@@ -227,7 +222,7 @@ const Login = () => {
           </div>
 
           <p className="text-center text-sm font-medium text-[#7A9489]">
-            New to MeetingAI?{' '}
+            New to ACTIFY?{' '}
             <Link to="/signup" className="text-[#B45309] font-bold hover:underline">Create an account</Link>
           </p>
         </div>

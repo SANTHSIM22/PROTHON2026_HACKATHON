@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import axios from 'axios';
+import { Check } from 'lucide-react';
+import actifyLogo from '../assets/actify-logo.svg';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -255,22 +257,26 @@ const Settings = () => {
       <header className="bg-[#0C1A15] sticky top-0 z-30 border-b border-white/5">
         <div className="max-w-[1200px] mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#B45309] to-[#F59E0B] flex items-center justify-center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            <button onClick={() => window.history.back()} className="w-8 h-8 rounded-lg hover:bg-[#1A2823] flex items-center justify-center transition-colors group">
+              <svg className="w-5 h-5 text-[#7A9489] group-hover:text-[#D97706]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
               </svg>
+            </button>
+            <div className=" flex items-center">
+              <img src={actifyLogo} alt="ACTIFY logo" className="w-9 h-9" />
             </div>
             <div>
-              <h1 className="text-white text-lg font-semibold tracking-tight">Settings</h1>
-              <p className="text-[#8FA89F] text-xs mt-0.5">{user?.name}</p>
+              <h1 className="text-white text-lg font-semibold" style={{ fontFamily: "var(--font-brand)" }}>ACTIFY</h1>
+              <p className="text-[#7A9489] text-xs mt-0.5" style={{ fontFamily: "var(--font-sans)" }}>Settings</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/dashboard')} className="text-[#8FA89F] hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all flex items-center gap-1.5">
+            <button onClick={() => navigate('/dashboard')} className="text-[#7A9489] hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/5 transition-all flex items-center gap-1.5" style={{ fontFamily: "var(--font-sans)" }}>
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
               Dashboard
             </button>
-            <button onClick={handleLogout} className="text-[#B91C1C]/70 hover:text-[#B91C1C] text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#B91C1C]/5 transition-all">
+            <button onClick={handleLogout} className="text-[#B91C1C]/70 hover:text-[#B91C1C] text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#B91C1C]/5 transition-all" style={{ fontFamily: "var(--font-sans)" }}>
               Logout
             </button>
           </div>
@@ -321,7 +327,9 @@ const Settings = () => {
                         section.status === 'configured' ? 'bg-[#D97706]/10 text-[#D97706]' :
                         'bg-[#F7FAF8] text-[#8FA89F]'
                       }`}>
-                        {section.status === 'connected' ? '✓' : section.status === 'configured' ? '✓' : section.status}
+                        {section.status === 'connected' || section.status === 'configured' ? (
+                          <Check className="w-3 h-3" strokeWidth={3} />
+                        ) : section.status}
                       </span>
                     )}
                   </button>

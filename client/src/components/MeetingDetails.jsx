@@ -28,10 +28,22 @@ const MeetingDetails = () => {
   };
 
   const handleStatusChange = async (actionIndex, newStatus) => {
+    const previousMeeting = meeting;
+
+    setMeeting((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        actionItems: (prev.actionItems || []).map((item, idx) => (
+          idx === actionIndex ? { ...item, status: newStatus } : item
+        )),
+      };
+    });
+
     try {
-      const response = await meetingsAPI.updateActionStatus(id, actionIndex, newStatus);
-      setMeeting(response.data);
+      await meetingsAPI.updateActionStatus(id, actionIndex, newStatus);
     } catch (err) {
+      setMeeting(previousMeeting);
       setError('Failed to update action item');
     }
   };

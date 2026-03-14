@@ -1,3 +1,5 @@
+import { CheckCircle2, Zap } from 'lucide-react';
+
 const MeetingCard = ({ meeting, onView, onEdit, onDelete }) => {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -24,11 +26,11 @@ const MeetingCard = ({ meeting, onView, onEdit, onDelete }) => {
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="flex items-center space-x-2 text-sm">
-            <span className="text-lg">✓</span>
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
             <span className="text-gray-700">{actionItemsCount} Items</span>
           </div>
           <div className="flex items-center space-x-2 text-sm">
-            <span className="text-lg">⚡</span>
+            <Zap className="w-4 h-4 text-amber-600" />
             <span className="text-gray-700">{openItems} Open</span>
           </div>
         </div>
