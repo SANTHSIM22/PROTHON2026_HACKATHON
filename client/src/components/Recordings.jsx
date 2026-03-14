@@ -37,7 +37,7 @@ const Recordings = () => {
   const fetchRecordings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/recordings/mine', {
+      const response = await axios.get('/api/recordings/mine', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const recs = response.data;
@@ -61,7 +61,7 @@ const Recordings = () => {
     try {
       setTranscribingIds(prev => ({ ...prev, [id]: true }));
       const token = localStorage.getItem('token');
-      const response = await axios.post(`http://localhost:5000/api/recordings/${id}/transcribe`, {}, {
+      const response = await axios.post(`/api/recordings/${id}/transcribe`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRecordings(prev => prev.map(r => r._id === id ? { ...r, transcript: response.data.transcript } : r));
@@ -75,7 +75,7 @@ const Recordings = () => {
   const fetchMeetingNames = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/recordings/organization/meetings', {
+      const response = await axios.get('/api/recordings/organization/meetings', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMeetingNames(response.data);
@@ -94,7 +94,7 @@ const Recordings = () => {
     if (!meetingName) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/recordings/organization/meetings/${meetingName}`, {
+      const response = await axios.get(`/api/recordings/organization/meetings/${meetingName}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrgTranscript(response.data);
@@ -102,12 +102,12 @@ const Recordings = () => {
       // Auto-transcribe if needed!
       if (response.data.needsTranscription) {
         setIsTranscribingMeeting(true);
-        await axios.post(`http://localhost:5000/api/recordings/organization/meetings/${meetingName}/transcribe`, {}, {
+        await axios.post(`/api/recordings/organization/meetings/${meetingName}/transcribe`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
         // Re-fetch now that transcription is complete
-        const finalResponse = await axios.get(`http://localhost:5000/api/recordings/organization/meetings/${meetingName}`, {
+        const finalResponse = await axios.get(`/api/recordings/organization/meetings/${meetingName}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setOrgTranscript(finalResponse.data);
@@ -122,7 +122,7 @@ const Recordings = () => {
   const handleUpdateMeetingName = async (id, newName) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/recordings/${id}/meeting`, { meetingName: newName }, {
+      await axios.put(`/api/recordings/${id}/meeting`, { meetingName: newName }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRecordings(recordings.map(rec => rec._id === id ? { ...rec, meetingName: newName } : rec));
@@ -140,7 +140,7 @@ const Recordings = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/recordings/${id}`, {
+      await axios.delete(`/api/recordings/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -158,7 +158,7 @@ const Recordings = () => {
       const token = localStorage.getItem('token');
       // Set UI to loading state for this specific transcription task if desired
       alert('Starting Deep Diarization on Backend. This takes a moment...');
-      const response = await axios.post(`http://localhost:5000/api/recordings/${id}/transcribe`, {}, {
+      const response = await axios.post(`/api/recordings/${id}/transcribe`, {}, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -177,7 +177,7 @@ const Recordings = () => {
     setIsExporting(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:5000/api/recordings/organization/meetings/${selectedMeeting}/export`, {}, {
+      await axios.post(`/api/recordings/organization/meetings/${selectedMeeting}/export`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       alert('Successfully exported formatted transcript to data1.json!');
@@ -357,7 +357,7 @@ const Recordings = () => {
                   </div>
                   <div className="w-full md:w-auto flex items-center gap-4">
                     <audio controls preload="metadata" className="w-full md:w-75 outline-none">
-                      <source src={`http://localhost:5000/api/recordings/stream/${rec._id}`} type="audio/mp3" />
+                      <source src={`/api/recordings/stream/${rec._id}`} type="audio/mp3" />
                       Your browser does not support the audio element.
                     </audio>
                     {transcribingIds[rec._id] ? (

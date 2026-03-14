@@ -21,6 +21,6 @@
     "activeTab"
   ],
   "host_permissions": [
-    "http://localhost:5000/*"
+    "https://prothon2026-hackathon.onrender.com/*"
   ]
 }

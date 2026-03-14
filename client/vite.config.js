@@ -8,4 +8,9 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+    server: {
+    host: true,
+    hmr: false,
+    allowedHosts: ['hackathon.acrossthe.cloud'],
+  },
 })
