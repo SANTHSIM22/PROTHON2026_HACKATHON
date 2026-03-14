@@ -427,7 +427,7 @@ const StructuredDataPanel = ({ data }) => {
               <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
             <span className="text-[#a7c5b8] text-[12px] font-semibold tracking-wide" style={{ fontFamily: 'var(--font-mono)' }}>
-              structured_data.json
+              semi_structured_data.json
             </span>
             <span
               className="ml-1 px-1.5 py-px rounded text-[9px] font-bold uppercase tracking-wider"

@@ -95,7 +95,7 @@ async function startRecording(token) {
       formData.append('transcriptData', JSON.stringify(transcriptData));
       
       // In production, change the hardcoded URL to your https://prod-url/api/... or inject from a config.
-      const UPLOAD_URL = 'https://prothon2026-hackathon.onrender.com/api/recordings/upload';
+      const UPLOAD_URL = 'http://localhost:5000/api/recordings/upload';
       try {
         const response = await fetch(UPLOAD_URL, {
           method: 'POST',

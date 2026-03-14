@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Use a config file or build system in production
   // For local: 'http://localhost:5000/api/auth'
   // For production: 'https://your-production-url.com/api/auth'
-  const API_URL = 'https://prothon2026-hackathon.onrender.com/api/auth'; 
+  const API_URL = 'http://localhost:5000/api/auth'; 
 
   // Check if user is already logged in
   chrome.storage.local.get(['token', 'user', 'isRecording'], (result) => {
