@@ -94,8 +94,10 @@ async function startRecording(token) {
       // Inject our exact timestamps and transcript JSON
       formData.append('transcriptData', JSON.stringify(transcriptData));
       
+      // In production, change the hardcoded URL to your https://prod-url/api/... or inject from a config.
+      const UPLOAD_URL = 'http://localhost:5000/api/recordings/upload';
       try {
-        const response = await fetch('http://localhost:5000/api/recordings/upload', {
+        const response = await fetch(UPLOAD_URL, {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer ' + userToken

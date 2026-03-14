@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const userNameSpan = document.getElementById('user-name');
   const userRoleSpan = document.getElementById('user-role');
 
-  // Assuming your backend runs on port 5000; update if it's different.
+  // Use a config file or build system in production
+  // For local: 'http://localhost:5000/api/auth'
+  // For production: 'https://your-production-url.com/api/auth'
   const API_URL = 'http://localhost:5000/api/auth'; 
 
   // Check if user is already logged in
