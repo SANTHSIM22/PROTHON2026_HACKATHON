@@ -10,7 +10,11 @@ export default defineConfig({
   ],
     server: {
     host: true,
-    hmr: false,
+    hmr: {
+      host: 'hackathon.acrossthe.cloud',
+      port: 443,
+      protocol: 'wss'
+    },
     allowedHosts: ['hackathon.acrossthe.cloud'],
   },
 })

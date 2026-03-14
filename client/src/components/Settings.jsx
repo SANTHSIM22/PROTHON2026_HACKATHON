@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const Settings = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -48,7 +50,7 @@ const Settings = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/settings', { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.get(`${API_URL}/settings`, { headers: { Authorization: `Bearer ${token}` } });
       const settings = response.data.settings;
       if (settings.github.repositoryUrl) {
         setGithubUrl(settings.github.repositoryUrl);
@@ -84,7 +86,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put('/api/settings/github', { token: githubToken, repositoryUrl: githubUrl }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.put(`${API_URL}/settings/github`, { token: githubToken, repositoryUrl: githubUrl }, { headers: { Authorization: `Bearer ${token}` } });
       setGithubValidated(response.data.github.validated);
       setGithubOwner(response.data.github.owner);
       setGithubRepo(response.data.github.repo);
@@ -97,7 +99,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put('/api/settings/preferences', { autoCreateGitHubIssues: autoCreateIssues, notifyOnIssueCreation: notifyOnCreation }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put(`${API_URL}/settings/preferences`, { autoCreateGitHubIssues: autoCreateIssues, notifyOnIssueCreation: notifyOnCreation }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Preferences saved successfully');
     } catch (err) { setError(err.response?.data?.error || 'Failed to save preferences'); } finally { setSaving(false); }
   };
@@ -106,7 +108,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put('/api/settings/trello', { apiKey: trelloApiKey === '••••••••' ? undefined : trelloApiKey, apiToken: trelloApiToken === '••••••••' ? undefined : trelloApiToken, listId: trelloListId }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put(`${API_URL}/settings/trello`, { apiKey: trelloApiKey === '••••••••' ? undefined : trelloApiKey, apiToken: trelloApiToken === '••••••••' ? undefined : trelloApiToken, listId: trelloListId }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Trello settings saved successfully');
     } catch (err) { setError(err.response?.data?.error || 'Failed to save Trello settings'); } finally { setSaving(false); }
   };
@@ -115,7 +117,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put('/api/settings/notion', { apiKey: notionApiKey === '••••••••' ? undefined : notionApiKey, databaseId: notionDatabaseId }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put(`${API_URL}/settings/notion`, { apiKey: notionApiKey === '••••••••' ? undefined : notionApiKey, databaseId: notionDatabaseId }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Notion settings saved successfully');
     } catch (err) { setError(err.response?.data?.error || 'Failed to save Notion settings'); } finally { setSaving(false); }
   };
@@ -125,7 +127,7 @@ const Settings = () => {
     try {
       setSaving(true); setError('');
       const token = localStorage.getItem('token');
-      await axios.delete('/api/settings/github', { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`${API_URL}/settings/github`, { headers: { Authorization: `Bearer ${token}` } });
       setGithubToken(''); setGithubUrl(''); setGithubValidated(false); setGithubOwner(''); setGithubRepo('');
       setSuccess('GitHub settings cleared');
     } catch (err) { setError(err.response?.data?.error || 'Failed to clear GitHub settings'); } finally { setSaving(false); }
@@ -143,7 +145,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      await axios.put('/api/settings/contacts', { contacts }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put(`${API_URL}/settings/contacts`, { contacts }, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Contacts saved successfully');
     } catch (err) { setError(err.response?.data?.error || 'Failed to save contacts'); } finally { setSaving(false); }
   };
@@ -152,7 +154,7 @@ const Settings = () => {
     try {
       setSaving(true); setError(''); setSuccess('');
       const token = localStorage.getItem('token');
-      const response = await axios.put('/api/settings/google-calendar', { 
+      const response = await axios.put(`${API_URL}/settings/google-calendar`, { 
         accessToken: calendarToken === '••••••••' ? undefined : calendarToken, 
         clientId: calendarClientId === '••••••••' ? undefined : calendarClientId, 
         clientSecret: calendarClientSecret === '••••••••' ? undefined : calendarClientSecret, 

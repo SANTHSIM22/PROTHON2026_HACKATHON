@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -70,7 +72,7 @@ const Dashboard = () => {
   const fetchAvailableData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/agents/available-data', {
+      const response = await axios.get(`${API_URL}/agents/available-data`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAvailableData(response.data.meetings || []);
@@ -83,11 +85,11 @@ const Dashboard = () => {
   const fetchGitHubSettings = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/settings', {
+      const response = await axios.get(import.meta.env.VITE_API_URL + '/settings', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setGithubSettings(response.data.settings.github);
-      if (response.data.settings.contacts) setContacts(response.data.settings.contacts);
+      setGithubSettings(response.data.settings?.github || {});
+      if (response.data.settings?.contacts) setContacts(response.data.settings.contacts);
     } catch (err) {
       console.error('Failed to load Settings:', err);
     }
@@ -98,7 +100,7 @@ const Dashboard = () => {
       setProcessingData(true);
       setError('');
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/process-data', { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/process-data`, { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
       setProcessedData(response.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to process data');
@@ -110,7 +112,7 @@ const Dashboard = () => {
   const extractGitHubIssues = async (analysisText) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-github-issues', { analysisText }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-github-issues`, { analysisText }, { headers: { Authorization: `Bearer ${token}` } });
       return response.data.issues?.length > 0 ? response.data.issues : null;
     } catch { return null; }
   };
@@ -118,7 +120,7 @@ const Dashboard = () => {
   const extractGitHubPRs = async (analysisText) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-github-pull-requests', { analysisText }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-github-pull-requests`, { analysisText }, { headers: { Authorization: `Bearer ${token}` } });
       return response.data.pullRequests?.length > 0 ? response.data.pullRequests : null;
     } catch { return null; }
   };
@@ -126,7 +128,7 @@ const Dashboard = () => {
   const extractEmailsAPI = async (idx) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-emails', { dataIndex: idx }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-emails`, { dataIndex: idx }, { headers: { Authorization: `Bearer ${token}` } });
       return response.data.emails?.length > 0 ? response.data.emails : null;
     } catch { return null; }
   };
@@ -134,7 +136,7 @@ const Dashboard = () => {
   const extractEventsAPI = async (idx) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-events', { dataIndex: idx }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-events`, { dataIndex: idx }, { headers: { Authorization: `Bearer ${token}` } });
       return response.data.events?.length > 0 ? response.data.events : null;
     } catch { return null; }
   };
@@ -161,7 +163,7 @@ const Dashboard = () => {
     setShowIssueConfirmation(false); setCreatingIssues(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/create-github-issues', { conversationId: `conv_data_${processedData.meetingId}`, issues: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/create-github-issues`, { conversationId: `conv_data_${processedData.meetingId}`, issues: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
       const sc = response.data.successCount || response.data.issues?.filter(i => i.success).length || 0;
       if (sc > 0) {
         const nums = response.data.issues?.filter(i => i.success && i.issueNumber)?.map(i => i.issueNumber) || [];
@@ -177,7 +179,7 @@ const Dashboard = () => {
     setAssigningIssues(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/assign-issues', { issueAssignments: assignments }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/assign-issues`, { issueAssignments: assignments }, { headers: { Authorization: `Bearer ${token}` } });
       alert(`Assigned ${response.data.successCount} issue(s)`); setShowAssignIssues(false); setAssignees({});
     } catch (err) { setError(`Failed: ${err.response?.data?.error || err.message}`); } finally { setAssigningIssues(false); }
   };
@@ -202,7 +204,7 @@ const Dashboard = () => {
     setCreatingPR(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/create-pull-requests', { pullRequests: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/create-pull-requests`, { pullRequests: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.failureCount > 0) {
         const err = response.data.pullRequests.find(p => !p.success)?.error || 'Unknown';
         alert(`Created ${response.data.successCount}, failed ${response.data.failureCount}. ${err}`);
@@ -231,7 +233,7 @@ const Dashboard = () => {
     setSendingEmails(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/send-emails', { emailTasks: toSend }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/send-emails`, { emailTasks: toSend }, { headers: { Authorization: `Bearer ${token}` } });
       const links = response.data.results.map(r => r.previewUrl).filter(Boolean).join('\n');
       alert(links ? `Sent ${response.data.successCount} email(s)!\n\n${links}` : `Sent ${response.data.successCount} email(s)!`);
       setShowEmailConfirmation(false);
@@ -256,7 +258,7 @@ const Dashboard = () => {
     setSchedulingEvents(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/create-calendar-events', { events: toSchedule }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/create-calendar-events`, { events: toSchedule }, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.failureCount > 0) {
         alert(`Scheduled ${response.data.successCount}, failed ${response.data.failureCount}.`);
       } else { alert(response.data.note || `Scheduled ${response.data.successCount} event(s)!`); }
@@ -268,7 +270,7 @@ const Dashboard = () => {
     try {
       setProcessingData(true);
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-trello-cards', { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-trello-cards`, { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
       setExtractedCards(response.data.cards);
       const sel = {}; response.data.cards.forEach((_, i) => { sel[i] = true; }); setSelectedCards(sel); setShowTrelloConfirmation(true);
     } catch (err) { setError(`Failed: ${err.response?.data?.error || err.message}`); } finally { setProcessingData(false); }
@@ -282,7 +284,7 @@ const Dashboard = () => {
     setCreatingCards(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/create-trello-cards', { cards: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/create-trello-cards`, { cards: toCreate }, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.failureCount > 0) {
         alert(`Created ${response.data.successCount}, failed ${response.data.failureCount}.`);
       } else { alert(response.data.note || `Created ${response.data.successCount} card(s)!`); }
@@ -294,7 +296,7 @@ const Dashboard = () => {
     try {
       setProcessingData(true);
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/extract-notion-summary', { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/extract-notion-summary`, { dataIndex: selectedDataIndex }, { headers: { Authorization: `Bearer ${token}` } });
       setExtractedSummary(response.data.summary); setShowNotionConfirmation(true);
     } catch (err) { setError(`Failed: ${err.response?.data?.error || err.message}`); } finally { setProcessingData(false); }
   };
@@ -304,7 +306,7 @@ const Dashboard = () => {
     setCreatingNotionPage(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('/api/agents/create-notion-page', { summary: extractedSummary, title: `Meeting Summary - ${new Date().toLocaleDateString()}` }, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await axios.post(`${API_URL}/agents/create-notion-page`, { summary: extractedSummary, title: `Meeting Summary - ${new Date().toLocaleDateString()}` }, { headers: { Authorization: `Bearer ${token}` } });
       alert(response.data.pageUrl ? `Notion page created!\n\n${response.data.pageUrl}` : (response.data.note || 'Notion page created!'));
       setShowNotionConfirmation(false);
     } catch (err) { setError(`Failed: ${err.response?.data?.error || err.message}`); } finally { setCreatingNotionPage(false); }
