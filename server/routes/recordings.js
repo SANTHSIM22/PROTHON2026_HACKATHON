@@ -5,6 +5,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import authMiddleware from '../middleware/auth.js';
 import AudioRecording from '../models/AudioRecording.js';
+import OrganizationData from '../models/OrganizationData.js';
 import { PassThrough } from 'stream';
 import { AssemblyAI } from 'assemblyai'; // Free Tier API for Diarization
 import fs from 'fs';
@@ -409,23 +410,30 @@ router.post('/organization/meetings/:meetingName/export', authMiddleware, async 
       transcript: transcriptString
     };
 
-    // Read the current data1.json
-    const dataPath = path.join(__dirname, '../data/data1.json');
-    let dbData = { meetings: [] };
-    if (fs.existsSync(dataPath)) {
-      const rawData = fs.readFileSync(dataPath, 'utf8');
-      try {
-        dbData = JSON.parse(rawData);
-        if (!dbData.meetings) dbData.meetings = [];
-      } catch(e) {
-        dbData = { meetings: [] };
-      }
+    // Store in Database based on organization
+    const orgId = req.user.id;
+    let orgData = await OrganizationData.findOne({ organizationId: orgId });
+    
+    if (!orgData) {
+      orgData = new OrganizationData({ organizationId: orgId, meetings: [] });
     }
 
-    dbData.meetings.push(newStructuredMeeting);
-    fs.writeFileSync(dataPath, JSON.stringify(dbData, null, 2), 'utf8');
+    // Check if same meeting exists
+    const existingMeetingIndex = orgData.meetings.findIndex(m => m.title === meetingName);
 
-    res.json({ message: 'Successfully exported to structured data!', meeting: newStructuredMeeting });
+    if (existingMeetingIndex !== -1) {
+      // Update existing
+      orgData.meetings[existingMeetingIndex].transcript = newStructuredMeeting.transcript;
+      orgData.meetings[existingMeetingIndex].attendees = newStructuredMeeting.attendees;
+      orgData.meetings[existingMeetingIndex].date = newStructuredMeeting.date;
+    } else {
+      // Insert new meeting index array
+      orgData.meetings.push(newStructuredMeeting);
+    }
+    
+    await orgData.save();
+
+    res.json({ message: 'Successfully exported structured data to MongoDB!', meeting: newStructuredMeeting });
   } catch (err) {
     console.error('Export Data Error:', err);
     res.status(500).json({ error: 'Failed to export structured data.' });
